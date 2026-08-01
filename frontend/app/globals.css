@@ -37,6 +37,7 @@ button { background: none; border: 0; cursor: pointer; }
 
 /* ---------- landing ---------- */
 .landing { display: grid; place-items: center; min-height: 100dvh; padding: 24px; text-align: center; }
+.landing-mark { display: block; margin: 0 auto 22px; color: var(--text); opacity: 0.95; }
 .landing h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
 .landing p { margin-top: 12px; color: var(--muted); max-width: 44ch; }
 .gbtn {
@@ -67,7 +68,16 @@ button { background: none; border: 0; cursor: pointer; }
 .side[data-collapsed="true"] .collapse .ico { transform: rotate(180deg); }
 
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; padding: 2px 6px 16px; }
-.brand-mark { display: grid; place-items: center; flex-shrink: 0; }
+.brand-mark {
+  display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px;
+  border-radius: 8px; color: var(--text); transition: background 0.12s;
+}
+.brand-mark[data-btn="true"] { cursor: pointer; }
+.brand-mark[data-btn="true"]:hover { background: var(--card-hover); }
+
+/* ---------- phone top bar (hidden on desktop) ---------- */
+.topbar { display: none; }
+.scrim { display: none; }
 .collapse {
   display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0;
   border-radius: 7px; color: var(--muted); transition: background 0.12s, color 0.12s;
@@ -354,17 +364,72 @@ button { background: none; border: 0; cursor: pointer; }
 .btn.primary.danger { background: #c9503f; color: #fff; }
 .btn.primary.danger:hover:not(:disabled) { background: #d95b49; }
 
-@media (max-width: 720px) {
-  .side { position: fixed; z-index: 20; height: 100dvh; width: var(--side-w-min); padding: 12px 8px; }
-  .side .lbl { display: none; }
-  .side .brand, .side .sect { justify-content: center; }
-  .side .nav button, .side .nav-item, .side .collapse, .side .fmain { justify-content: center; padding-inline: 0; }
-  .side .fcard { justify-content: center; padding: 9px 0; }
-  .side .fdel, .side .storage, .side .collapse { display: none; }
-  .main { margin-left: var(--side-w-min); }
-  .scroll { padding: 18px 14px; }
-  .composer-wrap { padding: 0 14px 16px; }
+/* ---------- phone ---------- */
+@media (max-width: 820px) {
+  /* Sidebar becomes an overlay drawer: a 68px rail would eat a fifth of the
+     screen and the labels would be gone anyway. */
+  .side {
+    position: fixed; inset: 0 auto 0 0; z-index: 50;
+    width: min(84vw, 300px); padding: 14px 12px;
+    transform: translateX(-100%); transition: transform 0.26s var(--ease);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+  .side[data-drawer="true"] { transform: none; }
+  /* The desktop rail state must never leak into the drawer. */
+  .side[data-collapsed="true"] { width: min(84vw, 300px); }
+  .side[data-collapsed="true"] .lbl,
+  .side[data-collapsed="true"] .storage,
+  .side[data-collapsed="true"] .fdel { display: revert; }
+  .side[data-collapsed="true"] .brand,
+  .side[data-collapsed="true"] .sect { justify-content: space-between; }
+  .side[data-collapsed="true"] .nav button,
+  .side[data-collapsed="true"] .nav-item,
+  .side[data-collapsed="true"] .fmain { justify-content: flex-start; padding-inline: 10px; }
+  .side[data-collapsed="true"] .fcard { justify-content: flex-start; padding: 9px 10px; }
+  .side .collapse, .rail-meter { display: none; }
+  .brand-mark { pointer-events: none; }
+  .fdel { opacity: 1; }          /* no hover on touch */
+
+  .scrim {
+    display: block; position: fixed; inset: 0; z-index: 40;
+    background: rgba(0, 0, 0, 0.55); opacity: 0; pointer-events: none;
+    transition: opacity 0.26s var(--ease);
+  }
+  .scrim[data-on="true"] { opacity: 1; pointer-events: auto; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--rule); background: var(--bg);
+  }
+  .round {
+    display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0;
+    border-radius: 50%; background: var(--card); color: var(--text);
+  }
+  .round:active { background: var(--card-hover); }
+  .topbrand {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+    font-weight: 650; font-size: 15px; color: var(--text);
+  }
+
+  .main { margin-left: 0; }
+  .scroll { padding: 16px 14px; }
+  .page-h { display: none; }     /* the top bar already names the view */
+  .turn { margin-bottom: 26px; }
+  .q { font-size: 17px; }
+  .hero h2 { font-size: 25px; }
+  .drop-spacer[data-empty="true"] { height: 18vh; }
+
+  .composer-wrap { padding: 0 12px calc(12px + env(safe-area-inset-bottom)); }
+  .composer { border-radius: 24px; padding: 7px 8px; gap: 6px; }
+  .composer textarea { font-size: 16px; }   /* < 16px makes iOS zoom on focus */
+  .iconbtn { width: 36px; height: 36px; }
+  .actions { gap: 8px; margin-top: 10px; }
+  .actions button { padding: 7px 14px; font-size: 12px; }
+  .scope { display: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
+  .srcs-scroll { max-height: 260px; }
+  .modal { max-width: none; border-radius: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

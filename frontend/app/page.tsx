@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { I } from "@/components/Icons";
+import { I, Logo } from "@/components/Icons";
 
 export default function Landing() {
   const [ready, setReady] = useState(false);
@@ -19,6 +19,7 @@ export default function Landing() {
   return (
     <main className="landing">
       <div>
+        <span className="landing-mark"><Logo size={54} /></span>
         <h1>Notes Rag</h1>
         <p>
           Upload your notes, papers and documents — then ask questions about them.

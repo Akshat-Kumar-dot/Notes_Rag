@@ -1,6 +1,6 @@
 "use client";
 
-import { I } from "@/components/Icons";
+import { I, Logo } from "@/components/Icons";
 import type { Folder, Storage, User } from "@/lib/api";
 
 export type View = "chat" | "files" | "history" | "settings";
@@ -18,8 +18,8 @@ const NAV: { id: View; label: string; icon: keyof typeof I }[] = [
 ];
 
 export function Sidebar({
-  user, folders, storage, activeFolder, view, collapsed,
-  onSelectFolder, onView, onNewFolder, onDeleteFolder, onToggleCollapse,
+  user, folders, storage, activeFolder, view, collapsed, drawer,
+  onSelectFolder, onView, onNewFolder, onDeleteFolder, onToggleCollapse, onCloseDrawer,
 }: {
   user: User;
   folders: Folder[];
@@ -27,29 +27,38 @@ export function Sidebar({
   activeFolder: string | null;
   view: View;
   collapsed: boolean;
+  drawer: boolean;
   onSelectFolder: (id: string) => void;
   onView: (v: View) => void;
   onNewFolder: () => void;
   onDeleteFolder: (f: Folder) => void;
   onToggleCollapse: () => void;
+  onCloseDrawer: () => void;
 }) {
   const pct = storage && storage.limit_bytes
     ? Math.min(100, (storage.used_bytes / storage.limit_bytes) * 100)
     : 0;
 
   return (
-    <aside className="side" data-collapsed={collapsed}>
+    <>
+      {/* Phone drawer scrim. Absent from the layout entirely on desktop. */}
+      <div className="scrim" data-on={drawer} onClick={onCloseDrawer} aria-hidden="true" />
+      <aside className="side" data-collapsed={collapsed} data-drawer={drawer}>
       <div className="brand">
-        <span className="brand-mark">{I.logo}</span>
+        {/* Collapsed, the mark is the only way back -- so it is the control. */}
+        <button className="brand-mark" onClick={collapsed ? onToggleCollapse : undefined}
+          data-btn={collapsed}
+          title={collapsed ? "Expand sidebar" : undefined}
+          aria-label={collapsed ? "Expand sidebar" : undefined}>
+          <Logo size={20} />
+        </button>
         <span className="lbl brand-name grow">Notes Rag</span>
-        <button className="collapse lbl" onClick={onToggleCollapse}
-          title="Collapse sidebar" aria-label="Collapse sidebar">{I.panel}</button>
+        {/* Hidden once collapsed: nothing to collapse, and no room for it. */}
+        {!collapsed && (
+          <button className="collapse" onClick={onToggleCollapse}
+            title="Collapse sidebar" aria-label="Collapse sidebar">{I.panel}</button>
+        )}
       </div>
-      {/* Collapsed, the brand row has no room -- the toggle gets its own line. */}
-      {collapsed && (
-        <button className="collapse rail" onClick={onToggleCollapse}
-          title="Expand sidebar" aria-label="Expand sidebar">{I.panel}</button>
-      )}
 
       <nav className="nav">
         {NAV.map((n) => (
@@ -141,6 +150,7 @@ export function Sidebar({
           </span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -7,7 +7,14 @@ import { History } from "@/components/History";
 import { Modal, type ModalSpec } from "@/components/Modal";
 import { Settings } from "@/components/Settings";
 import { Sidebar, type View } from "@/components/Sidebar";
+import { Topbar } from "@/components/Topbar";
 import { api, type Folder, type Storage, type User } from "@/lib/api";
+
+const TITLES: Partial<Record<View, string>> = {
+  files: "My Files",
+  history: "Chat History",
+  settings: "Settings",
+};
 
 export default function Workspace() {
   const [user, setUser] = useState<User | null>(null);
@@ -19,6 +26,7 @@ export default function Workspace() {
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [modal, setModal] = useState<ModalSpec | null>(null);
+  const [drawer, setDrawer] = useState(false);
 
   const loadFolders = useCallback(async () => {
     const list = await api.folders();
@@ -48,6 +56,14 @@ export default function Workspace() {
       localStorage.setItem("sidebar", c ? "open" : "collapsed");
       return !c;
     });
+
+  // Escape closes the drawer, matching the dialog's behaviour.
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
 
   // Errors are thrown so the dialog can show them inline and stay open, rather
   // than closing and dropping the user's typing on the floor.
@@ -99,14 +115,25 @@ export default function Workspace() {
         activeFolder={activeId}
         view={view}
         collapsed={collapsed}
-        onSelectFolder={(id) => { setActiveId(id); if (view === "settings" || view === "history") setView("chat"); }}
-        onView={setView}
+        drawer={drawer}
+        onSelectFolder={(id) => {
+          setActiveId(id);
+          if (view === "settings" || view === "history") setView("chat");
+          setDrawer(false);
+        }}
+        onView={(v) => { setView(v); setDrawer(false); }}
         onNewFolder={newFolder}
         onDeleteFolder={deleteFolder}
         onToggleCollapse={toggleCollapse}
+        onCloseDrawer={() => setDrawer(false)}
       />
 
       <main className="main">
+        <Topbar
+          title={TITLES[view] ?? active?.name ?? "Notes Rag"}
+          onMenu={() => setDrawer(true)}
+          onNew={newFolder}
+        />
         {view === "files" && (
           <div className="scroll">
             {active

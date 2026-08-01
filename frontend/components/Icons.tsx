@@ -4,8 +4,31 @@ const s = (d: string, w = 16, sw = 1.8) => (
     dangerouslySetInnerHTML={{ __html: d }} />
 );
 
+/** Brand mark: a retrieval graph — one node reaching out to eight sources.
+ *  Spokes stop short of each node so nothing has to be masked with a
+ *  background fill, which keeps it legible on any surface at any size. */
+export function Logo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 300 300" fill="none"
+      stroke="currentColor" strokeWidth={12} strokeLinecap="round" aria-hidden="true">
+      <g opacity="0.9">
+        <path d="M184 150h46M174 174l32.6 32.6M150 184v46M126 174l-32.6 32.6M116 150H70M126 126 93.4 93.4M150 116V70M174 126l32.6-32.6" />
+      </g>
+      <g strokeWidth={14}>
+        <circle cx="250" cy="150" r="14" /><circle cx="220.7" cy="220.7" r="14" />
+        <circle cx="150" cy="250" r="14" /><circle cx="79.3" cy="220.7" r="14" />
+        <circle cx="50" cy="150" r="14" /><circle cx="79.3" cy="79.3" r="14" />
+        <circle cx="150" cy="50" r="14" /><circle cx="220.7" cy="79.3" r="14" />
+      </g>
+      <circle cx="150" cy="150" r="26" strokeWidth={16} />
+    </svg>
+  );
+}
+
 export const I = {
-  logo: s('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>', 17),
+  logo: <Logo size={19} />,
+  menu: s('<path d="M4 7h16M4 13h11"/>', 20, 2),
+  edit: s('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>', 17),
   folder: s('<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>'),
   file: s('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'),
   chat: s('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
