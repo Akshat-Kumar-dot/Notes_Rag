@@ -51,7 +51,8 @@ export function Files({ folderId, onChanged }: { folderId: string; onChanged: ()
   }
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div className="page">
+      <h2 className="page-h">My Files</h2>
       {error && <p className="note err">{error}</p>}
 
       <div
@@ -82,10 +83,10 @@ export function Files({ folderId, onChanged }: { folderId: string; onChanged: ()
         return (
           <div key={f.id}>
             <div className="filerow">
-              {I.file}
+              <span className="ico">{I.file}</span>
               <span className="grow trunc">
-                <span className="trunc" style={{ display: "block" }}>{f.original_filename}</span>
-                <span className="dim">
+                <span className="t trunc">{f.original_filename}</span>
+                <span className="s">
                   {f.chunk_count > 0 ? `${f.chunk_count} passages indexed` : "—"}
                 </span>
               </span>

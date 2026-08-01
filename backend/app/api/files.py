@@ -5,19 +5,44 @@ from pathlib import PurePosixPath
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.folders import owned_folder
 from app.auth.deps import DB, CurrentUser
 from app.config import settings
 from app.ingest import process_file
-from app.models import File, FileStatus
+from app.models import File, FileStatus, Folder
 from app.parsers.base import EXTENSION_MIME
 from app.parsers import SUPPORTED_MIMES
-from app.schemas import FileOut
+from app.schemas import FileOut, StorageOut
 from app.storage import discard, stage
 
 router = APIRouter(tags=["files"])
+
+
+def _mb(n: int) -> str:
+    return f"{n / (1024 * 1024):.0f}MB"
+
+
+@router.get("/storage", response_model=StorageOut)
+async def storage_usage(user: CurrentUser, db: DB) -> StorageOut:
+    """Backs the sidebar meter. Counts uploaded bytes, which is also what the
+    quota is enforced against, so the bar and the limit always agree."""
+    used, files = (
+        await db.execute(
+            select(func.coalesce(func.sum(File.size_bytes), 0), func.count(File.id))
+            .where(File.user_id == user.id)
+        )
+    ).one()
+    folders = await db.scalar(
+        select(func.count()).select_from(Folder).where(Folder.user_id == user.id)
+    )
+    return StorageOut(
+        used_bytes=int(used or 0),
+        limit_bytes=settings.storage_limit_mb * 1024 * 1024,
+        file_count=files or 0,
+        folder_count=folders or 0,
+    )
 
 
 def _detect_mime(upload: UploadFile) -> str:
@@ -56,6 +81,17 @@ async def upload(
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             f"Files must be under {settings.max_upload_mb}MB.",
+        )
+
+    limit = settings.storage_limit_mb * 1024 * 1024
+    used = await db.scalar(
+        select(func.coalesce(func.sum(File.size_bytes), 0)).where(File.user_id == user.id)
+    )
+    if int(used or 0) + len(data) > limit:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"That would exceed your {_mb(limit)} storage limit "
+            f"({_mb(int(used or 0))} used). Delete something first.",
         )
 
     digest = hashlib.sha256(data).hexdigest()

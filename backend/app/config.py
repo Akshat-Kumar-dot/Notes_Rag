@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     # --- ingest ---
     max_upload_mb: int = 20
+    # Per-user cap on total uploaded bytes. Enforced on upload, and what the
+    # sidebar meter fills against -- a bar with no real limit behind it would be
+    # decoration. Sized for Neon's free tier, which is ~0.5GB for everything.
+    storage_limit_mb: int = 500
     chunk_tokens: int = 450
     chunk_overlap_tokens: int = 60
     embed_batch_size: int = 50

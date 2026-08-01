@@ -215,7 +215,12 @@ async def _generate(user_id: UUID, conversation_id: UUID, question: str) -> Asyn
                     )
                 )
 
-            if len(convo.messages) <= 1 and convo.title == "New chat":
+            # First exchange in a fresh conversation: title it from the question.
+            # `history` was loaded before this turn's message was added, so it is
+            # empty exactly when this is the first turn. Avoid touching
+            # convo.messages -- that lazy relationship isn't loaded here, and
+            # accessing it under async SQLAlchemy raises MissingGreenlet.
+            if not history and convo.title == "New chat":
                 convo.title = question[:80]
             await db.commit()
 

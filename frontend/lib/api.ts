@@ -20,7 +20,8 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export interface User { id: string; email: string | null; display_name: string | null; avatar_url: string | null; }
-export interface Folder { id: string; name: string; created_at: string; file_count: number; }
+export interface Folder { id: string; name: string; created_at: string; file_count: number; size_bytes: number; }
+export interface Storage { used_bytes: number; limit_bytes: number; file_count: number; folder_count: number; }
 export interface FileRow {
   id: string; folder_id: string; original_filename: string; size_bytes: number;
   status: "pending" | "parsing" | "indexed" | "partial" | "failed";
@@ -32,12 +33,24 @@ export interface Source {
   page_number: number | null; heading: string | null; excerpt: string; score: number;
 }
 export interface Conversation { id: string; title: string; folder_ids: string[]; updated_at: string; }
+export interface Citation {
+  rank: number; score: number | null; excerpt_snapshot: string;
+  source_label: string; chunk_id: string | null;
+}
+export interface Message {
+  id: string; role: "user" | "assistant"; content: string;
+  low_confidence: boolean; created_at: string; citations: Citation[];
+}
 
 export const api = {
   me: () => req<User>("/auth/me"),
   logout: () => req<void>("/auth/logout", { method: "POST" }),
 
+  storage: () => req<Storage>("/storage"),
+
   folders: () => req<Folder[]>("/folders"),
+  renameFolder: (id: string, name: string) =>
+    req<Folder>(`/folders/${id}`, { ...json({ name }), method: "PATCH" }),
   createFolder: (name: string) => req<Folder>("/folders", json({ name })),
   deleteFolder: (id: string) => req<void>(`/folders/${id}`, { method: "DELETE" }),
 
@@ -61,7 +74,8 @@ export const api = {
   conversations: () => req<Conversation[]>("/conversations"),
   createConversation: (folderIds: string[]) =>
     req<Conversation>("/conversations", json({ folder_ids: folderIds })),
-  conversation: (id: string) => req<Conversation & { messages: unknown[] }>(`/conversations/${id}`),
+  conversation: (id: string) => req<Conversation & { messages: Message[] }>(`/conversations/${id}`),
+  deleteConversation: (id: string) => req<void>(`/conversations/${id}`, { method: "DELETE" }),
 };
 
 export interface StreamHandlers {

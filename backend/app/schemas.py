@@ -36,6 +36,14 @@ class FolderOut(BaseModel):
     name: str
     created_at: datetime
     file_count: int
+    size_bytes: int = 0
+
+
+class StorageOut(BaseModel):
+    used_bytes: int
+    limit_bytes: int
+    file_count: int
+    folder_count: int
 
 
 # --- files ---

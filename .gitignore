@@ -7,3 +7,4 @@ out/
 static/
 .venv/
 venv/
+.git.old/

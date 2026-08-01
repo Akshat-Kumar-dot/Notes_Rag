@@ -1,78 +1,144 @@
 "use client";
 
 import { I } from "@/components/Icons";
-import type { Folder, User } from "@/lib/api";
+import type { Folder, Storage, User } from "@/lib/api";
 
-const fmt = (n: number) =>
-  n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+export type View = "chat" | "files" | "history" | "settings";
+
+export const fmtBytes = (n: number) =>
+  n < 1024 ? `${n} B`
+    : n < 1048576 ? `${(n / 1024).toFixed(0)} KB`
+      : n < 1073741824 ? `${(n / 1048576).toFixed(1)} MB`
+        : `${(n / 1073741824).toFixed(2)} GB`;
+
+const NAV: { id: View; label: string; icon: keyof typeof I }[] = [
+  { id: "chat", label: "Chat", icon: "chat" },
+  { id: "files", label: "My Files", icon: "file" },
+  { id: "history", label: "Chat History", icon: "history" },
+];
 
 export function Sidebar({
-  user, folders, activeFolder, view, indexedBytes,
-  onSelectFolder, onView, onNewFolder, onSignOut,
+  user, folders, storage, activeFolder, view, collapsed,
+  onSelectFolder, onView, onNewFolder, onDeleteFolder, onToggleCollapse,
 }: {
   user: User;
   folders: Folder[];
+  storage: Storage | null;
   activeFolder: string | null;
-  view: "chat" | "files";
-  indexedBytes: number;
+  view: View;
+  collapsed: boolean;
   onSelectFolder: (id: string) => void;
-  onView: (v: "chat" | "files") => void;
+  onView: (v: View) => void;
   onNewFolder: () => void;
-  onSignOut: () => void;
+  onDeleteFolder: (f: Folder) => void;
+  onToggleCollapse: () => void;
 }) {
+  const pct = storage && storage.limit_bytes
+    ? Math.min(100, (storage.used_bytes / storage.limit_bytes) * 100)
+    : 0;
+
   return (
-    <aside className="side">
-      <div className="brand">{I.logo} Notes Rag</div>
-
-      <nav className="nav">
-        <button data-on={view === "files"} onClick={() => onView("files")}>
-          {I.file} My Files
-        </button>
-        <button data-on={view === "chat"} onClick={() => onView("chat")}>
-          {I.chat} Chat
-        </button>
-      </nav>
-
-      <div className="sect">Workspace</div>
-      {folders.map((f) => (
-        <button
-          key={f.id}
-          className="fcard"
-          data-on={activeFolder === f.id}
-          onClick={() => onSelectFolder(f.id)}
-        >
-          {I.folder}
-          <span className="grow trunc">
-            <span className="t trunc" style={{ display: "block" }}>{f.name}</span>
-            <span className="s">{f.file_count} {f.file_count === 1 ? "file" : "files"}</span>
-          </span>
-          {I.chevron}
-        </button>
-      ))}
-      <button className="fcard" onClick={onNewFolder}>
-        {I.plus}
-        <span className="grow"><span className="t">New folder</span></span>
-      </button>
-
-      <div className="sect">Indexed</div>
-      <div style={{ padding: "0 8px" }}>
-        {/* Size of extracted text, not uploaded bytes -- originals are discarded.
-            No cap shown: quotas don't exist yet, and a fake limit would mislead. */}
-        <div className="meter"><span style={{ width: indexedBytes ? "100%" : "0%" }} /></div>
-        <div className="s" style={{ color: "var(--muted)", fontSize: 11 }}>
-          {fmt(indexedBytes)} across {folders.length} {folders.length === 1 ? "folder" : "folders"}
-        </div>
+    <aside className="side" data-collapsed={collapsed}>
+      <div className="brand">
+        <span className="brand-mark">{I.logo}</span>
+        <span className="lbl brand-name">Notes Rag</span>
       </div>
 
-      <div className="user">
-        <button className="fcard" onClick={onSignOut} title="Sign out">
+      <nav className="nav">
+        {NAV.map((n) => (
+          <button key={n.id} data-on={view === n.id} onClick={() => onView(n.id)} title={n.label}>
+            <span className="ico">{I[n.icon]}</span>
+            <span className="lbl">{n.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="sep" />
+
+      <div className="sect">
+        <span className="lbl">Workspace</span>
+        <button className="mini" onClick={onNewFolder} title="New folder">{I.plus}</button>
+      </div>
+
+      <div className="folders">
+        {folders.map((f) => (
+          <div key={f.id} className="fcard" data-on={activeFolder === f.id}>
+            <button className="fmain" onClick={() => onSelectFolder(f.id)} title={f.name}>
+              <span className="ico">{I.folder}</span>
+              <span className="grow trunc lbl">
+                <span className="t trunc">{f.name}</span>
+                <span className="s">
+                  {f.file_count} {f.file_count === 1 ? "file" : "files"}
+                  {f.size_bytes > 0 && ` · ${fmtBytes(f.size_bytes)}`}
+                </span>
+              </span>
+            </button>
+            <button
+              className="fdel lbl"
+              title={`Delete "${f.name}"`}
+              aria-label={`Delete folder ${f.name}`}
+              onClick={() => onDeleteFolder(f)}
+            >
+              {I.trash}
+            </button>
+          </div>
+        ))}
+
+        {folders.length === 0 && (
+          <button className="fcard newf lbl" onClick={onNewFolder}>
+            <span className="ico">{I.plus}</span>
+            <span className="t">New folder</span>
+          </button>
+        )}
+      </div>
+
+      <div className="sep" />
+
+      <div className="sect"><span className="lbl">Storage</span></div>
+      <div className="storage lbl">
+        <div className="meter" title={`${pct.toFixed(0)}% used`}>
+          <span style={{ width: `${pct}%` }} data-full={pct > 90} />
+        </div>
+        <div className="s">
+          {storage
+            ? <>{fmtBytes(storage.used_bytes)} / {fmtBytes(storage.limit_bytes)} · {storage.file_count} {storage.file_count === 1 ? "file" : "files"}</>
+            : "—"}
+        </div>
+      </div>
+      {/* Collapsed rail still needs a usage signal, but the text won't fit. */}
+      {collapsed && (
+        <div className="rail-meter" title={storage ? `${pct.toFixed(0)}% of storage used` : "Storage"}>
+          <span style={{ height: `${pct}%` }} />
+        </div>
+      )}
+
+      <div className="foot">
+        <div className="sep" />
+        <button
+          className="nav-item"
+          data-on={view === "settings"}
+          onClick={() => onView("settings")}
+          title="Settings"
+        >
+          <span className="ico">{I.settings}</span>
+          <span className="lbl">Settings</span>
+        </button>
+
+        <button className="nav-item acct" onClick={() => onView("settings")} title={user.email ?? "Account"}>
           {user.avatar_url
             ? <img className="avatar" src={user.avatar_url} alt="" />
-            : I.user}
-          <span className="grow trunc">
-            <span className="t trunc" style={{ display: "block" }}>{user.display_name ?? "Signed in"}</span>
-            <span className="s trunc" style={{ display: "block" }}>Sign out</span>
+            : <span className="ico">{I.user}</span>}
+          <span className="grow trunc lbl">
+            <span className="t trunc">{user.display_name ?? "Account"}</span>
+            <span className="s trunc">{user.email ?? "Signed in"}</span>
           </span>
+        </button>
+
+        <button className="collapse" onClick={onToggleCollapse}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          <span className="ico">{I.panel}</span>
+          <span className="lbl">Collapse</span>
         </button>
       </div>
     </aside>

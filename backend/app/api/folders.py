@@ -29,7 +29,11 @@ async def owned_folder(db: DB, user: User, folder_id: UUID) -> Folder:
 async def list_folders(user: CurrentUser, db: DB):
     rows = (
         await db.execute(
-            select(Folder, func.count(File.id))
+            select(
+                Folder,
+                func.count(File.id),
+                func.coalesce(func.sum(File.size_bytes), 0),
+            )
             .outerjoin(File, File.folder_id == Folder.id)
             .where(Folder.user_id == user.id)
             .group_by(Folder.id)
@@ -37,8 +41,11 @@ async def list_folders(user: CurrentUser, db: DB):
         )
     ).all()
     return [
-        FolderOut(id=f.id, name=f.name, created_at=f.created_at, file_count=n)
-        for f, n in rows
+        FolderOut(
+            id=f.id, name=f.name, created_at=f.created_at,
+            file_count=n, size_bytes=int(size),
+        )
+        for f, n, size in rows
     ]
 
 
@@ -68,11 +75,14 @@ async def rename_folder(folder_id: UUID, payload: FolderCreate, user: CurrentUse
         raise HTTPException(
             status.HTTP_409_CONFLICT, "You already have a folder with that name."
         ) from None
-    count = await db.scalar(
-        select(func.count()).select_from(File).where(File.folder_id == folder.id)
-    )
+    count, size = (
+        await db.execute(
+            select(func.count(File.id), func.coalesce(func.sum(File.size_bytes), 0))
+            .where(File.folder_id == folder.id)
+        )
+    ).one()
     return FolderOut(id=folder.id, name=folder.name, created_at=folder.created_at,
-                     file_count=count or 0)
+                     file_count=count or 0, size_bytes=int(size or 0))
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
