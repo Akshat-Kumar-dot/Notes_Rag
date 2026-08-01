@@ -41,8 +41,15 @@ export function Sidebar({
     <aside className="side" data-collapsed={collapsed}>
       <div className="brand">
         <span className="brand-mark">{I.logo}</span>
-        <span className="lbl brand-name">Notes Rag</span>
+        <span className="lbl brand-name grow">Notes Rag</span>
+        <button className="collapse lbl" onClick={onToggleCollapse}
+          title="Collapse sidebar" aria-label="Collapse sidebar">{I.panel}</button>
       </div>
+      {/* Collapsed, the brand row has no room -- the toggle gets its own line. */}
+      {collapsed && (
+        <button className="collapse rail" onClick={onToggleCollapse}
+          title="Expand sidebar" aria-label="Expand sidebar">{I.panel}</button>
+      )}
 
       <nav className="nav">
         {NAV.map((n) => (
@@ -132,13 +139,6 @@ export function Sidebar({
             <span className="t trunc">{user.display_name ?? "Account"}</span>
             <span className="s trunc">{user.email ?? "Signed in"}</span>
           </span>
-        </button>
-
-        <button className="collapse" onClick={onToggleCollapse}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-          <span className="ico">{I.panel}</span>
-          <span className="lbl">Collapse</span>
         </button>
       </div>
     </aside>

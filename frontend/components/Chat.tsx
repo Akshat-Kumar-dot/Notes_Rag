@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { I } from "@/components/Icons";
+import { Markdown } from "@/lib/markdown";
 import { api, streamMessage, type Folder, type Source } from "@/lib/api";
 
 /** One rendered source card. Live results and stored citations both narrow to
@@ -32,21 +33,6 @@ const fromSource = (s: Source): Src => ({
   excerpt: s.excerpt,
   score: s.score,
 });
-
-/** Renders [2] markers as hoverable links to the matching source card. */
-function withCitations(text: string, active: number | null, onHover: (n: number | null) => void) {
-  return text.split(/(\[\d{1,2}\])/g).map((part, i) => {
-    const m = /^\[(\d{1,2})\]$/.exec(part);
-    if (!m) return <span key={i}>{part}</span>;
-    const n = Number(m[1]);
-    return (
-      <span key={i} className="cite" data-on={active === n}
-        onMouseEnter={() => onHover(n)} onMouseLeave={() => onHover(null)}>
-        {n}
-      </span>
-    );
-  });
-}
 
 // --- dictation -------------------------------------------------------------
 // Web Speech API is prefixed in Chromium and absent in Firefox, so the button
@@ -88,6 +74,7 @@ export function Chat({
   const [value, setValue] = useState("");
   const [mode, setMode] = useState<"ask" | "search">("ask");
   const [active, setActive] = useState<number | null>(null);
+  const [openSrc, setOpenSrc] = useState<Record<string, boolean>>({});
   const [listening, setListening] = useState(false);
   const [micOk, setMicOk] = useState(false);
   const convo = useRef<string | null>(null);
@@ -284,25 +271,44 @@ export function Chat({
 
                 {!t.searchOnly && (t.answer || t.streaming) && (
                   <div className={`a ${t.streaming && !t.answer ? "caret" : ""}`}>
-                    {withCitations(t.answer, active, setActive)}
+                    <Markdown text={t.answer} ctx={{ active, onHover: setActive }} />
                     {t.streaming && t.answer && <span className="caret" />}
                   </div>
                 )}
 
-                {t.sources.length > 0 && (
-                  <div className="srcs">
-                    {t.sources.map((s) => (
-                      <div key={s.key} className="src" data-on={active === s.n}
-                        onMouseEnter={() => setActive(s.n)} onMouseLeave={() => setActive(null)}>
-                        <div className="h">
-                          <span className="trunc">[{s.n}] {s.label}</span>
-                          {s.score !== null && <span>{s.score.toFixed(3)}</span>}
+                {t.sources.length > 0 && (() => {
+                  // Search mode has nothing but sources, so they open by default;
+                  // under an answer they stay folded until asked for.
+                  const open = openSrc[t.id] ?? t.searchOnly;
+                  return (
+                    <div className="srcs">
+                      <button className="srcs-toggle" data-open={open}
+                        aria-expanded={open}
+                        onClick={() => setOpenSrc((p) => ({ ...p, [t.id]: !open }))}>
+                        <span className="ico">{I.file}</span>
+                        <span className="grow">
+                          {t.sources.length} {t.sources.length === 1 ? "source" : "sources"}
+                        </span>
+                        <span className="chev">{I.chevron}</span>
+                      </button>
+
+                      {open && (
+                        <div className="srcs-scroll">
+                          {t.sources.map((s) => (
+                            <div key={s.key} className="src" data-on={active === s.n}
+                              onMouseEnter={() => setActive(s.n)} onMouseLeave={() => setActive(null)}>
+                              <div className="h">
+                                <span className="trunc">[{s.n}] {s.label}</span>
+                                {s.score !== null && <span>{s.score.toFixed(3)}</span>}
+                              </div>
+                              <div className="x">{s.excerpt}</div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="x">{s.excerpt}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  );
+                })()}
               </article>
             ))}
             <div ref={bottom} />

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { I } from "@/components/Icons";
+import type { ModalSpec } from "@/components/Modal";
 import { api, type Conversation } from "@/lib/api";
 
 const when = (iso: string) => {
@@ -14,7 +15,12 @@ const when = (iso: string) => {
   return d.toLocaleDateString();
 };
 
-export function History({ onOpen }: { onOpen: (id: string) => void }) {
+export function History({
+  onOpen, onConfirm,
+}: {
+  onOpen: (id: string) => void;
+  onConfirm: (spec: ModalSpec) => void;
+}) {
   const [rows, setRows] = useState<Conversation[] | null>(null);
 
   const load = useCallback(async () => {
@@ -23,12 +29,17 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function remove(id: string) {
-    if (!window.confirm("Delete this conversation? This can't be undone.")) return;
-    try {
-      await api.deleteConversation(id);
-      setRows((p) => (p ?? []).filter((c) => c.id !== id));
-    } catch { /* the list reload below will resync */ }
+  function remove(c: Conversation) {
+    onConfirm({
+      title: "Delete conversation?",
+      description: `"${c.title}" and its saved answers will be removed. This can't be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        await api.deleteConversation(c.id);
+        setRows((p) => (p ?? []).filter((x) => x.id !== c.id));
+      },
+    });
   }
 
   if (rows === null) return <div className="page"><p className="dim">Loading…</p></div>;
@@ -45,7 +56,7 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
             <span className="s">{when(c.updated_at)}</span>
           </button>
           <button className="dim" title="Delete conversation"
-            aria-label={`Delete conversation ${c.title}`} onClick={() => remove(c.id)}>
+            aria-label={`Delete conversation ${c.title}`} onClick={() => remove(c)}>
             {I.trash}
           </button>
         </div>

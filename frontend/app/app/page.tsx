@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/Chat";
 import { Files } from "@/components/Files";
 import { History } from "@/components/History";
+import { Modal, type ModalSpec } from "@/components/Modal";
 import { Settings } from "@/components/Settings";
 import { Sidebar, type View } from "@/components/Sidebar";
 import { api, type Folder, type Storage, type User } from "@/lib/api";
@@ -17,6 +18,7 @@ export default function Workspace() {
   const [collapsed, setCollapsed] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [modal, setModal] = useState<ModalSpec | null>(null);
 
   const loadFolders = useCallback(async () => {
     const list = await api.folders();
@@ -47,31 +49,37 @@ export default function Workspace() {
       return !c;
     });
 
-  async function newFolder() {
-    const name = window.prompt("Folder name");
-    if (!name?.trim()) return;
-    try {
-      const f = await api.createFolder(name.trim());
-      await refresh();
-      setActiveId(f.id);
-      setView("files");
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Couldn't create that folder.");
-    }
+  // Errors are thrown so the dialog can show them inline and stay open, rather
+  // than closing and dropping the user's typing on the floor.
+  function newFolder() {
+    setModal({
+      title: "New folder",
+      description: "Folders scope what a question is answered from.",
+      input: { label: "Name", placeholder: "Research papers" },
+      confirmLabel: "Create folder",
+      onConfirm: async (name) => {
+        const f = await api.createFolder(name);
+        await refresh();
+        setActiveId(f.id);
+        setView("files");
+      },
+    });
   }
 
-  async function deleteFolder(f: Folder) {
-    const msg = f.file_count > 0
-      ? `Delete "${f.name}" and its ${f.file_count} ${f.file_count === 1 ? "file" : "files"}? This can't be undone.`
-      : `Delete "${f.name}"?`;
-    if (!window.confirm(msg)) return;
-    try {
-      await api.deleteFolder(f.id);
-      if (activeId === f.id) setActiveId(null);
-      await refresh();
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Couldn't delete that folder.");
-    }
+  function deleteFolder(f: Folder) {
+    setModal({
+      title: `Delete "${f.name}"?`,
+      description: f.file_count > 0
+        ? `Its ${f.file_count} ${f.file_count === 1 ? "file" : "files"} and everything indexed from ${f.file_count === 1 ? "it" : "them"} will be removed. This can't be undone.`
+        : "This can't be undone.",
+      confirmLabel: "Delete folder",
+      danger: true,
+      onConfirm: async () => {
+        await api.deleteFolder(f.id);
+        if (activeId === f.id) setActiveId(null);
+        await refresh();
+      },
+    });
   }
 
   function openConversation(id: string) {
@@ -108,7 +116,9 @@ export default function Workspace() {
         )}
 
         {view === "history" && (
-          <div className="scroll"><History key={historyKey} onOpen={openConversation} /></div>
+          <div className="scroll">
+            <History key={historyKey} onOpen={openConversation} onConfirm={setModal} />
+          </div>
         )}
 
         {view === "settings" && (
@@ -132,6 +142,8 @@ export default function Workspace() {
           />
         )}
       </main>
+
+      <Modal spec={modal} onClose={() => setModal(null)} />
     </div>
   );
 }
