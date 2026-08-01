@@ -1,0 +1,48 @@
+# Render Blueprint. Create the service from this file:
+#   Render Dashboard -> New -> Blueprint -> pick this repo.
+# Render reads it, creates the web service, and PROMPTS you for every value
+# marked `sync: false` (the secrets). Nothing secret lives in this file or in git.
+#
+# After the first deploy:
+#   1. Copy the service URL, e.g. https://note-rag.onrender.com
+#   2. Set PUBLIC_BASE_URL to that URL (Environment tab), no trailing slash
+#   3. In Google Cloud Console -> your OAuth client -> Authorized redirect URIs,
+#      add:  https://note-rag.onrender.com/api/v1/auth/google/callback
+#   4. Redeploy (Manual Deploy -> Deploy latest commit)
+
+services:
+  - type: web
+    name: note-rag
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Match your Neon region to keep query latency low.
+    region: singapore
+    plan: free
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      # --- non-secret, safe to commit ---
+      - key: ENV
+        value: prod
+      - key: CHAT_MODEL
+        value: gemini-flash-lite-latest
+
+      # --- generated once by Render, never shown in git ---
+      - key: SECRET_KEY
+        generateValue: true
+
+      # --- secrets: Render prompts you for these at Blueprint creation ---
+      - key: DATABASE_URL
+        sync: false          # Neon connection string (paste verbatim)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Set AFTER the first deploy to the real service URL (see notes above).
+      # Leaving it blank on the first boot is fine; OAuth just won't work until set.
+      - key: PUBLIC_BASE_URL
+        sync: false
