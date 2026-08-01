@@ -1,0 +1,28 @@
+:root {
+  --ink: #14171a;
+  --paper: #f4f6f4;
+  --rule: #d9ded9;
+  --muted: #6b7370;
+  --signal: #16564f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.6 "IBM Plex Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 460px; margin: 0 auto; padding: 18vh 24px 0; }
+.title { font-size: 30px; letter-spacing: -0.02em; }
+.title span { color: var(--signal); }
+.sub { margin-top: 10px; color: var(--muted); }
+.btn {
+  display: inline-block; margin-top: 28px; padding: 10px 18px;
+  background: var(--signal); color: #fff; border: 0; border-radius: 3px;
+  font: inherit; font-size: 14px; text-decoration: none; cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--rule); }
+.err { margin-top: 20px; color: #a8571b; font-size: 13px; }
+.row { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
