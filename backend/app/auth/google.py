@@ -84,7 +84,7 @@ async def me(user: CurrentUser) -> UserOut:
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(request: Request, response: Response, db: DB) -> Response:
+async def logout(request: Request, response: Response, db: DB):
     token = request.cookies.get(COOKIE_NAME)
     if token:
         await revoke_session(db, token)

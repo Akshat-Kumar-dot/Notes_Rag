@@ -1,43 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-interface User {
-  email: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-}
+import { useCallback, useEffect, useState } from "react";
+import { Chat } from "@/components/Chat";
+import { Files } from "@/components/Files";
+import { Sidebar } from "@/components/Sidebar";
+import { api, type Folder, type User } from "@/lib/api";
 
 export default function Workspace() {
   const [user, setUser] = useState<User | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [view, setView] = useState<"chat" | "files">("chat");
 
-  useEffect(() => {
-    fetch("/api/v1/auth/me", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then(setUser)
-      .catch(() => window.location.replace("/"));
+  const loadFolders = useCallback(async () => {
+    const list = await api.folders();
+    setFolders(list);
+    setActiveId((cur) => cur ?? list[0]?.id ?? null);
   }, []);
 
-  async function logout() {
-    await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" });
-    window.location.replace("/");
+  useEffect(() => {
+    api.me().then(setUser).catch(() => {});
+    loadFolders().catch(() => {});
+  }, [loadFolders]);
+
+  async function newFolder() {
+    const name = window.prompt("Folder name");
+    if (!name?.trim()) return;
+    try {
+      const f = await api.createFolder(name.trim());
+      await loadFolders();
+      setActiveId(f.id);
+      setView("files");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Couldn't create that folder.");
+    }
   }
 
   if (!user) return null;
+  const active = folders.find((f) => f.id === activeId) ?? null;
 
   return (
-    <main className="wrap">
-      <h1 className="title">Signed in</h1>
-      <div className="row">
-        {user.avatar_url && <img className="avatar" src={user.avatar_url} alt="" />}
-        <div>
-          <div>{user.display_name}</div>
-          <div className="sub">{user.email}</div>
-        </div>
-      </div>
-      <button className="btn ghost" onClick={logout}>
-        Sign out
-      </button>
-    </main>
+    <div className="shell">
+      <Sidebar
+        user={user}
+        folders={folders}
+        activeFolder={activeId}
+        view={view}
+        indexedBytes={0}
+        onSelectFolder={(id) => { setActiveId(id); }}
+        onView={setView}
+        onNewFolder={newFolder}
+        onSignOut={async () => { await api.logout(); window.location.replace("/"); }}
+      />
+      <main className="main">
+        {view === "files" ? (
+          <div className="scroll">
+            {active
+              ? <Files folderId={active.id} onChanged={loadFolders} />
+              : <p className="dim">Create a folder to upload files.</p>}
+          </div>
+        ) : (
+          <Chat folder={active} />
+        )}
+      </main>
+    </div>
   );
 }

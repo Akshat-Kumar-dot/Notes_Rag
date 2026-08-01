@@ -27,6 +27,31 @@ class Settings(BaseSettings):
 
     session_ttl_days: int = 30
 
+    # --- Gemini (embeddings + generation) ---
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    embedding_model: str = "gemini-embedding-001"
+    # Gemini supports reduced output dims. 768 keeps vectors small -- Neon's free
+    # tier is ~0.5GB and a vector is bigger than the text it came from.
+    embedding_dim: int = 768
+    chat_model: str = "gemini-2.5-flash"
+
+    # --- ingest ---
+    max_upload_mb: int = 20
+    chunk_tokens: int = 450
+    chunk_overlap_tokens: int = 60
+    embed_batch_size: int = 50
+    # Keep the original file only when extraction was poor -- those are the ones
+    # worth OCRing later. Everything else is deleted once chunks are committed.
+    keep_original_below_coverage: float = 0.60
+
+    # --- retrieval ---
+    dense_candidates: int = 40
+    sparse_candidates: int = 40
+    rrf_k: int = 60
+    context_chunks: int = 8
+    min_score: float = 0.30
+
     @property
     def is_prod(self) -> bool:
         return self.env == "prod"

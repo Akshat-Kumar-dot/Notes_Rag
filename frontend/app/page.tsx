@@ -1,37 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { I } from "@/components/Icons";
 
 export default function Landing() {
-  const [checking, setChecking] = useState(true);
+  const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    setFailed(new URLSearchParams(window.location.search).get("error") !== null);
-    // Already signed in? Skip the landing page.
+    setFailed(new URLSearchParams(window.location.search).has("error"));
     fetch("/api/v1/auth/me", { credentials: "include" })
-      .then((r) => {
-        if (r.ok) window.location.replace("/app");
-        else setChecking(false);
-      })
-      .catch(() => setChecking(false));
+      .then((r) => (r.ok ? window.location.replace("/app") : setReady(true)))
+      .catch(() => setReady(true));
   }, []);
 
-  if (checking) return null;
+  if (!ready) return null;
 
   return (
-    <main className="wrap">
-      <h1 className="title">
-        notes<span>_</span>rag
-      </h1>
-      <p className="sub">
-        Upload your notes, then ask questions about them. Answers come back with the
-        passages they were built from.
-      </p>
-      <a className="btn" href="/api/v1/auth/google/login">
-        Continue with Google
-      </a>
-      {failed && <p className="err">Sign-in didn&apos;t complete. Try again.</p>}
+    <main className="landing">
+      <div>
+        <h1>Notes Rag</h1>
+        <p>
+          Upload your notes, papers and documents — then ask questions about them.
+          Every answer shows the passages it came from.
+        </p>
+        <a className="gbtn" href="/api/v1/auth/google/login">
+          {I.google} Continue with Google
+        </a>
+        {failed && <p className="note err" style={{ marginTop: 20 }}>Sign-in didn&apos;t complete. Try again.</p>}
+      </div>
     </main>
   );
 }

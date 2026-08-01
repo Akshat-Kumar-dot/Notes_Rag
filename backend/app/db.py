@@ -5,11 +5,14 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
+# Neon requires TLS; a local dev Postgres has none. Detect rather than hardcode.
+_CONNECT_ARGS = {} if "localhost" in settings.database_url or "127.0.0.1" in settings.database_url else {"ssl": "require"}
+
 # Neon's free compute allows few connections. Keep the pool small now, before
 # background jobs start multiplying it.
 engine = create_async_engine(
     settings.async_database_url,
-    connect_args={"ssl": "require"},
+    connect_args=_CONNECT_ARGS,
     pool_size=3,
     max_overflow=2,
     pool_pre_ping=True,
