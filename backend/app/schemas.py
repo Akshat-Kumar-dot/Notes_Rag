@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -10,12 +11,25 @@ class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GuestCredits(BaseModel):
+    uploads_left: int
+    messages_left: int
+    expires_at: datetime
+
+
 class UserOut(ORM):
     id: UUID
     email: str | None
     display_name: str | None
     avatar_url: str | None
     is_guest: bool
+    guest: GuestCredits | None = None   # only for guests
+
+
+class GuestStart(BaseModel):
+    # SHA-256 hex of browser traits, computed client-side. Only a deterrent:
+    # the client can send anything, so it is never trusted on its own.
+    fingerprint: str = Field(min_length=16, max_length=128)
 
 
 # --- folders ---
@@ -124,3 +138,83 @@ class ConversationOut(BaseModel):
 
 class ConversationDetail(ConversationOut):
     messages: list[MessageOut] = []
+
+
+# --- study map ---
+class MapFile(BaseModel):
+    id: UUID
+    name: str
+    status: str
+    # One entry per passage, in reading order. cells: current strength, or -1
+    # if never studied. ages: whole days since last studied, or -1.
+    cells: list[float]
+    ages: list[int]
+    pages: list[int | None]
+    ordinals: list[int]
+
+
+class StudyMap(BaseModel):
+    folder_id: UUID
+    folder_name: str
+    total: int
+    studied: int
+    fading: int
+    lit: float          # strength at and above which a passage counts as fresh
+    files: list[MapFile]
+
+
+class StudyRequest(BaseModel):
+    file_id: UUID
+    start: int = Field(ge=0)     # ordinal of the first passage
+    mode: Literal["teach", "quiz"]
+
+
+class Passage(BaseModel):
+    n: int
+    ordinal: int
+    label: str
+    excerpt: str | None = None   # withheld while a quiz is unanswered
+
+
+class StudyOut(BaseModel):
+    mode: Literal["teach", "quiz"]
+    text: str | None = None
+    quiz_id: UUID | None = None
+    question: str | None = None
+    passages: list[Passage]
+
+
+class QuizAnswer(BaseModel):
+    answer: str = Field(min_length=1, max_length=4000)
+
+
+class QuizResult(BaseModel):
+    score: float
+    verdict: Literal["correct", "partial", "wrong"]
+    feedback: str
+    missed: list[str]
+    points: list[str]
+    passages: list[Passage]
+
+
+# --- chat graph ---
+class GraphNode(BaseModel):
+    id: UUID
+    title: str
+    folder_ids: list[UUID]
+    message_count: int
+    updated_at: datetime
+    passages: int          # distinct passages its answers cited
+
+
+class GraphEdge(BaseModel):
+    source: UUID
+    target: UUID
+    weight: float
+    passages: int          # passages both chats cited
+    files: list[str]       # files both drew on, for "why are these linked?"
+
+
+class ChatGraph(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]

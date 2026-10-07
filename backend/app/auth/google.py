@@ -16,6 +16,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
 from app.auth.deps import DB, CurrentUser
+from app.auth.guest import user_out
 from app.auth.session import (
     COOKIE_NAME,
     clear_session_cookie,
@@ -79,8 +80,8 @@ async def google_callback(request: Request, db: DB):
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+async def me(user: CurrentUser, db: DB) -> UserOut:
+    return await user_out(db, user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

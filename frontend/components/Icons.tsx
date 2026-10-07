@@ -44,6 +44,14 @@ export const I = {
   chevron: s('<path d="m9 18 6-6-6-6"/>', 14),
   panel: s('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>', 16),
   logout: s('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>'),
+  arrow: s('<path d="M5 12h14M13 6l6 6-6 6"/>', 16, 2),
+  graph: s('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="9" cy="18" r="2.5"/><path d="M8.4 6.4l7.2 1.2M6.7 8.4l1.6 7.2M16.4 10l-5.8 6.2"/>', 16),
+  grid: s('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', 16),
+  expand: s('<path d="m6 17 5-5-5-5M13 17l5-5-5-5"/>', 16, 2),
+  check: s('<path d="M20 6 9 17l-5-5"/>', 13, 2.2),
+  sparkle: s('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/>', 14),
+  search: s('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 15),
+  quote: s('<path d="M4 6h16M4 12h10M4 18h7"/>', 16),
   google: (
     <svg width="17" height="17" viewBox="0 0 24 24">
       <path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6z" />

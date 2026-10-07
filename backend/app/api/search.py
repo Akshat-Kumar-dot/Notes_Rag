@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
+from app.auth import guest
 from app.auth.deps import DB, CurrentUser
 from app.rag.retrieval import retrieve
 from app.schemas import SearchHit, SearchResponse
@@ -22,6 +23,9 @@ async def search(
     folder_ids: list[UUID] = Query(default=[]),
     limit: int = Query(default=10, ge=1, le=30),
 ):
+    # Embedding the query is a Gemini call, so for a guest it costs a question.
+    # If retrieval fails, get_db rolls back and the credit is returned.
+    await guest.spend(db, user, "message")
     result = await retrieve(
         db, user_id=user.id, folder_ids=folder_ids, query=q, limit=limit
     )

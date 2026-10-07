@@ -8,6 +8,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, statu
 from sqlalchemy import func, select
 
 from app.api.folders import owned_folder
+from app import chat_store, study_store
+from app.auth import guest
 from app.auth.deps import DB, CurrentUser
 from app.config import settings
 from app.ingest import process_file
@@ -77,10 +79,12 @@ async def upload(
     data = await upload.read()
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file is empty.")
-    if len(data) > settings.max_upload_mb * 1024 * 1024:
+    max_mb = settings.guest_max_upload_mb if user.is_guest else settings.max_upload_mb
+    if len(data) > max_mb * 1024 * 1024:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"Files must be under {settings.max_upload_mb}MB.",
+            f"Files must be under {max_mb}MB"
+            + (" on the free trial. Sign in with Google for larger files." if user.is_guest else "."),
         )
 
     limit = settings.storage_limit_mb * 1024 * 1024
@@ -103,6 +107,10 @@ async def upload(
             status.HTTP_409_CONFLICT,
             f"You've already uploaded this file as '{existing.original_filename}'.",
         )
+
+    # Last, after every check that could reject the file: a guest should not
+    # lose their one upload to a duplicate or an oversized file.
+    await guest.spend(db, user, "upload")
 
     file = File(
         folder_id=folder.id,
@@ -154,4 +162,8 @@ async def delete_file(file_id: UUID, user: CurrentUser, db: DB):
     if file is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found.")
     await db.delete(file)
+    await db.commit()
     discard(file_id)
+    # Postgres used to SET NULL citations.chunk_id; chat history is in MongoDB now.
+    await chat_store.detach_file(user.id, file_id)
+    await study_store.forget_file(user.id, file_id)

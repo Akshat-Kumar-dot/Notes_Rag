@@ -16,7 +16,7 @@ export function Topbar({ title, onMenu, onNew }: {
         <Logo size={18} />
         <span className="trunc">{title}</span>
       </button>
-      <button className="round" onClick={onNew} aria-label="New folder">{I.edit}</button>
+      <button className="round" onClick={onNew} aria-label="New chat">{I.edit}</button>
     </header>
   );
 }

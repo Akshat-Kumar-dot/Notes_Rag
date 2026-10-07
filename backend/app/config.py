@@ -36,6 +36,34 @@ class Settings(BaseSettings):
     embedding_dim: int = 768
     chat_model: str = "gemini-2.5-flash"
 
+    # --- MongoDB (chat history) ---
+    # Local default; on Render set MONGODB_URL to the Atlas connection string.
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_db: str = "notes_rag"
+
+    # --- guest trial (use without signing in) ---
+    # What one trial allows. "Messages" covers Ask AI and Search Notes alike:
+    # both call Gemini (search embeds the query).
+    guest_uploads: int = 1
+    guest_messages: int = 2
+    guest_max_upload_mb: int = 5
+    # ~450 tokens each, so ~40 pages. Bounds the embedding cost of one upload.
+    guest_max_chunks: int = 60
+    # Guest accounts and everything they uploaded are deleted after this.
+    guest_ttl_hours: int = 24
+    # Abuse limits. None of these identify a person perfectly -- IPs are shared
+    # and changeable, fingerprints can be faked -- so the daily totals below are
+    # what actually bounds the API bill.
+    guest_device_window_days: int = 30
+    guest_trials_per_ip_per_day: int = 3
+    guest_daily_trials: int = 100
+    guest_daily_uploads: int = 100
+    guest_daily_messages: int = 300
+    # Proxies in front of the app that append to X-Forwarded-For. 0 = use the
+    # TCP peer (local dev). Render sets it to 1 -- verify with the log line in
+    # auth/guest.py after deploying: too high lets clients spoof their IP.
+    trusted_proxy_hops: int = 0
+
     # --- ingest ---
     max_upload_mb: int = 20
     # Per-user cap on total uploaded bytes. Enforced on upload, and what the

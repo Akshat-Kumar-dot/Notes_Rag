@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app import chat_store, study_store
 from app.auth.deps import DB, CurrentUser
 from app.models import File, Folder, User
 from app.schemas import FolderCreate, FolderOut
@@ -51,6 +52,13 @@ async def list_folders(user: CurrentUser, db: DB):
 
 @router.post("", response_model=FolderOut, status_code=status.HTTP_201_CREATED)
 async def create_folder(payload: FolderCreate, user: CurrentUser, db: DB):
+    if user.is_guest and await db.scalar(
+        select(func.count()).select_from(Folder).where(Folder.user_id == user.id)
+    ):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "The free trial comes with one folder. Sign in with Google for more.",
+        )
     folder = Folder(user_id=user.id, name=payload.name)
     db.add(folder)
     try:
@@ -89,3 +97,8 @@ async def rename_folder(folder_id: UUID, payload: FolderCreate, user: CurrentUse
 async def delete_folder(folder_id: UUID, user: CurrentUser, db: DB):
     folder = await owned_folder(db, user, folder_id)
     await db.delete(folder)
+    # Commit first: only touch chat history once the folder is really gone.
+    await db.commit()
+    # Postgres used to cascade this; chat history now lives in MongoDB.
+    await chat_store.detach_folder(user.id, folder_id)
+    await study_store.forget_folder(user.id, folder_id)

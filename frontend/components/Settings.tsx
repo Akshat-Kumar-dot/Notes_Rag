@@ -27,11 +27,13 @@ export function Settings({
             : <span className="ico">{I.user}</span>}
           <span className="grow trunc">
             <span className="t trunc">{user.display_name ?? "Signed in"}</span>
-            <span className="s trunc">{user.email ?? "No email on file"}</span>
+            <span className="s trunc">{user.email ?? (user.is_guest ? "Free trial" : "No email on file")}</span>
           </span>
-          <button className="btn danger" onClick={onSignOut}>
-            {I.logout} Sign out
-          </button>
+          {/* Signing a guest out would end the trial for good: this device
+              cannot start another. Offer the way forward instead. */}
+          {user.is_guest
+            ? <a className="btn primary" href="/api/v1/auth/google/login">Sign in with Google</a>
+            : <button className="btn danger" onClick={onSignOut}>{I.logout} Sign out</button>}
         </div>
       </section>
 

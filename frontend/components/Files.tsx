@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { I } from "@/components/Icons";
+import { Orb } from "@/components/Orb";
 import { api, type FileRow } from "@/lib/api";
 
 const LABEL: Record<FileRow["status"], string> = {
@@ -16,13 +17,17 @@ function statusLine(f: FileRow): string | null {
     // Specific beats vague: "partial" alone tells the user nothing actionable.
     return `${missing} of ${f.page_count} pages had no readable text. Those pages aren't searchable.`;
   }
-  return null;
+  // e.g. a free-trial document that was only partly indexed
+  return f.error;
 }
 
-export function Files({ folderId, onChanged }: { folderId: string; onChanged: () => void }) {
+export function Files({ folderId, folderName, onChanged }: {
+  folderId: string; folderName: string; onChanged: () => void;
+}) {
   const [files, setFiles] = useState<FileRow[]>([]);
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -42,17 +47,19 @@ export function Files({ folderId, onChanged }: { folderId: string; onChanged: ()
   async function send(list: FileList | null) {
     if (!list?.length) return;
     setError(null);
+    setUploading(true);
     for (const file of Array.from(list)) {
       try { await api.upload(folderId, file); }
       catch (e) { setError(e instanceof Error ? e.message : "Upload failed."); }
     }
+    setUploading(false);
     load();
     onChanged();
   }
 
   return (
     <div className="page">
-      <h2 className="page-h">My Files</h2>
+      <h2 className="page-h">{folderName}</h2>
       {error && <p className="note err">{error}</p>}
 
       <div
@@ -64,11 +71,15 @@ export function Files({ folderId, onChanged }: { folderId: string; onChanged: ()
         onClick={() => input.current?.click()}
         style={{ cursor: "pointer", marginBottom: 18 }}
       >
-        <div style={{ display: "grid", placeItems: "center", gap: 8 }}>
-          {I.upload}
-          <div>Drop files here, or click to choose</div>
-          <div style={{ fontSize: 11 }}>PDF, Word, text, Markdown, images — up to 20MB</div>
-        </div>
+        {uploading ? (
+          <Orb wait="reading" size={32} label="Uploading…" className="drop-wait" />
+        ) : (
+          <div style={{ display: "grid", placeItems: "center", gap: 8 }}>
+            {I.upload}
+            <div>Drop files here, or click to choose</div>
+            <div style={{ fontSize: 11 }}>PDF, Word, text, Markdown, images — up to 20MB</div>
+          </div>
+        )}
         <input
           ref={input} type="file" multiple hidden
           accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
@@ -90,7 +101,9 @@ export function Files({ folderId, onChanged }: { folderId: string; onChanged: ()
                   {f.chunk_count > 0 ? `${f.chunk_count} passages indexed` : "—"}
                 </span>
               </span>
-              <span className="badge" data-s={f.status}>{LABEL[f.status]}</span>
+              {f.status === "pending" || f.status === "parsing"
+                ? <Orb wait="reading" label={f.status === "pending" ? "Queued" : "Reading…"} className="file-wait" />
+                : <span className="badge" data-s={f.status}>{LABEL[f.status]}</span>}
               <button
                 className="dim"
                 title="Delete"

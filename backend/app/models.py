@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -216,6 +217,46 @@ class Chunk(Base):
     tsv: Mapped[str | None] = mapped_column(TSVECTOR)  # maintained by DB trigger
 
     file: Mapped[File] = relationship()
+
+
+# ------------------------------------------------------------- guest trial
+
+
+class GuestTrial(Base):
+    """One row per free trial. Outlives the guest account (user_id goes NULL
+    when the guest is purged), so the same device or network cannot simply
+    start over the next day. Identifiers are HMAC hashes, never raw IPs."""
+
+    __tablename__ = "guest_trials"
+    __table_args__ = (
+        Index("ix_guest_trials_ip_created", "ip_hash", "created_at"),
+        Index("ix_guest_trials_device", "device_hash"),
+        Index("ix_guest_trials_fp_ip", "fingerprint_hash", "ip_hash"),
+    )
+
+    id: Mapped[uuid.UUID] = _pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), unique=True
+    )
+    ip_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    device_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    fingerprint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    uploads_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    messages_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DailyUsage(Base):
+    """Site-wide guest counters, one row per (day, kind). The hard ceiling on
+    what guests can cost in a day, however many IPs they rotate through."""
+
+    __tablename__ = "daily_usage"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 # ----------------------------------------------------------- conversations

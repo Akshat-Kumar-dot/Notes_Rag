@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 class Hit:
     chunk_id: UUID
     file_id: UUID
+    folder_id: UUID
     filename: str
     folder_name: str
     page_number: int | None
@@ -75,7 +76,7 @@ fused AS (
 )
 SELECT f.id AS chunk_id, f.dense_score, f.sparse_score, f.score,
        c.text, c.heading, c.page_number,
-       fi.id AS file_id, fi.original_filename, fo.name AS folder_name
+       fi.id AS file_id, c.folder_id, fi.original_filename, fo.name AS folder_name
 FROM fused f
 JOIN chunks c  ON c.id = f.id
 JOIN files fi  ON fi.id = c.file_id
@@ -155,6 +156,7 @@ async def retrieve(
         Hit(
             chunk_id=r["chunk_id"],
             file_id=r["file_id"],
+            folder_id=r["folder_id"],
             filename=r["original_filename"],
             folder_name=r["folder_name"],
             page_number=r["page_number"],

@@ -10,9 +10,12 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlalchemy import select
+
+from app.auth.guest import refund
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Chunk, File, FileStatus, FileText
+from app.models import Chunk, File, FileStatus, FileText, User
 from app.parsers import ParseError, parser_for
 from app.rag.chunking import chunk_pages
 from app.rag.embeddings import EmbeddingError, embed_documents
@@ -26,6 +29,7 @@ async def process_file(file_id: UUID) -> None:
         file = await db.get(File, file_id)
         if file is None:
             return
+        is_guest = bool(await db.scalar(select(User.is_guest).where(User.id == file.user_id)))
         file.status = FileStatus.PARSING
         await db.commit()
 
@@ -40,6 +44,11 @@ async def process_file(file_id: UUID) -> None:
         )
         if not pieces:
             raise ParseError("Nothing indexable was found in this file.")
+        # Embedding is the expensive step, so a guest's one document is capped
+        # by chunks rather than bytes: a 5MB text file can hold 1,000+ pages.
+        truncated = is_guest and len(pieces) > settings.guest_max_chunks
+        if truncated:
+            pieces = pieces[: settings.guest_max_chunks]
 
         vectors = await embed_documents([p.text for p in pieces])
 
@@ -73,6 +82,13 @@ async def process_file(file_id: UUID) -> None:
             file.parser_version = result.parser_version
             file.chunk_count = len(pieces)
             file.indexed_at = datetime.now(UTC)
+            if truncated:
+                # Shown under the file, so the guest knows why later pages
+                # never come up in answers.
+                file.error = (
+                    f"Free trial: only the first {len(pieces)} sections were indexed. "
+                    "Sign in with Google to index whole documents."
+                )
             file.status = (
                 FileStatus.PARTIAL if coverage < settings.keep_original_below_coverage
                 else FileStatus.INDEXED
@@ -89,9 +105,17 @@ async def process_file(file_id: UUID) -> None:
 
     except (ParseError, EmbeddingError) as exc:
         await _fail(file_id, str(exc))
+        await _refund_guest(file.user_id, is_guest)
     except Exception:
         log.exception("ingest failed for %s", file_id)
         await _fail(file_id, "Something went wrong processing this file.")
+        await _refund_guest(file.user_id, is_guest)
+
+
+async def _refund_guest(user_id: UUID, is_guest: bool) -> None:
+    """An unreadable file should not cost a guest their only upload."""
+    if is_guest:
+        await refund(user_id, "upload")
 
 
 async def _fail(file_id: UUID, message: str) -> None:

@@ -1,22 +1,71 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.api import chat, files, folders, search
-from app.auth import google
+from app import mongo
+from app.api import chat, files, folders, search, study
+from app.auth import google, guest
 from app.config import settings
 from app.db import engine
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)-7s %(name)s %(message)s")
 
-app = FastAPI(title="Note_Rag", docs_url=None if settings.is_prod else "/docs")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await mongo.ensure_indexes()
+    try:
+        await guest.purge_expired_guests()
+    except Exception:
+        logging.getLogger(__name__).exception("guest purge failed on startup")
+    yield
+    await mongo.client.close()
+
+
+app = FastAPI(
+    title="Note_Rag",
+    docs_url=None if settings.is_prod else "/docs",
+    lifespan=lifespan,
+)
+
+class CacheHeaders:
+    """Pages must be revalidated on every load; without a Cache-Control header
+    browsers cache them heuristically and keep showing the previous build after
+    a deploy. The JS/CSS they point to have content-hashed names, so those can
+    be cached forever. Pure ASGI (not BaseHTTPMiddleware) so SSE streams from
+    the API pass through untouched -- the API is skipped entirely anyway."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope["type"] != "http" or path.startswith(settings.api_prefix):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_cache(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if path.startswith("/_next/static/"):
+                    headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                elif headers.get("content-type", "").startswith("text/html"):
+                    headers["Cache-Control"] = "no-cache"
+            await send(message)
+
+        await self.app(scope, receive, send_with_cache)
+
+
+app.add_middleware(CacheHeaders)
 
 # Carries the OAuth `state` value between /login and /callback only. Unrelated
 # to the login session, which lives in Postgres.
@@ -40,11 +89,16 @@ async def health() -> JSONResponse:
         pgvector = await conn.scalar(
             text("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
         )
+    try:
+        mongo_ok = (await mongo.client.admin.command("ping")).get("ok") == 1.0
+    except Exception:
+        mongo_ok = False
     return JSONResponse(
         {
             "ok": True,
             "env": settings.env,
             "pgvector": pgvector,
+            "mongodb": mongo_ok,
             "gemini_configured": bool(settings.gemini_api_key),
         }
     )
@@ -52,7 +106,8 @@ async def health() -> JSONResponse:
 
 # Routers BEFORE the static mount. Mounting "/" first swallows every API route
 # and returns HTML from /api/v1/auth/me.
-for r in (google.router, folders.router, files.router, search.router, chat.router):
+for r in (google.router, guest.router, folders.router, files.router, search.router, chat.router,
+          study.router):
     app.include_router(r, prefix=settings.api_prefix)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"

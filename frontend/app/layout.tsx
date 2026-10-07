@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted at build time (no request to Google at runtime). Exposed as a
+// CSS variable only, so the workspace keeps the system font and just the
+// landing page opts in.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Notes Rag",
-  description: "Ask questions about your own documents.",
+  description: "Upload your notes and papers, ask questions, and get answers that cite the exact passage they came from.",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
@@ -18,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body>{children}</body>
     </html>
   );
