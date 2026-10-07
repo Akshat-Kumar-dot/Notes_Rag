@@ -46,6 +46,10 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # MongoDB Atlas connection string (chat history, study map). Required: the
+      # app refuses to start in production without it.
+      - key: MONGODB_URL
+        sync: false
 
       # Set AFTER the first deploy to the real service URL (see notes above).
       # Leaving it blank on the first boot is fine; OAuth just won't work until set.

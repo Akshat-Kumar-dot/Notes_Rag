@@ -225,8 +225,20 @@ Original plan:
 - `render.yaml`: add `MONGODB_URL` (`sync: false`). `.env.example`: add
   `MONGODB_URL` with a placeholder. The code defaults to localhost, so prod
   **must** set it.
-- Run the step 5 migration against the production Neon DB → Atlas before
-  deploying the new code, or old chats vanish in prod too.
+- Fill Atlas before the new code goes live, or chats vanish in prod:
+  `python copy_mongo.py "<atlas url>"` (from backend/, venv active). One run
+  copies chats still in Postgres (including any made on the live site after
+  the local migration) and chats made locally in MongoDB; the longer copy of a
+  chat wins, and chats deleted locally since the migration are not revived.
+  Tested against a throwaway database on 8 Oct 2026: 27 chats = 26 local + 1
+  made on the live site, 5 locally deleted skipped.
+- **What went wrong on 8 Oct 2026:** "Update UI" was pushed before Atlas
+  existed. Render's CMD ran `alembic upgrade head` (stamping the shared DB to
+  0003), then the app died trying to reach MongoDB on localhost. The previous
+  deploy stayed live but would have failed its next cold start on 0003, so the
+  DB was stamped back to 0002. The app now refuses to start in prod without a
+  real MONGODB_URL, and that check runs inside alembic too, before it touches
+  the database.
 
 ### Step 8: docs and tests
 - `ARCHITECTURE.md`: update the request path ("persist message + citation rows"
