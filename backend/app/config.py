@@ -107,7 +107,19 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    s = Settings()  # type: ignore[call-arg]
+    # On Render there is no MongoDB on localhost. Unchecked, a missing
+    # MONGODB_URL surfaced as a 30-second timeout and a stack trace -- after
+    # `alembic upgrade head` had already run against the shared database.
+    # Checked here (not in a pydantic validator, whose error would echo the
+    # settings, secrets included, into the logs), it stops the deploy before
+    # either.
+    if s.is_prod and any(h in s.mongodb_url for h in ("localhost", "127.0.0.1")):
+        raise SystemExit(
+            "MONGODB_URL is not set. In production it must be your MongoDB Atlas "
+            "connection string (mongodb+srv://...). Set it in Render -> Environment."
+        )
+    return s
 
 
 settings = get_settings()
