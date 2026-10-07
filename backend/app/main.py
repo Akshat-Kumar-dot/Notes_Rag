@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -37,29 +39,85 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+BUILD_COOKIE = "build"
+
+
+def _build_id() -> str | None:
+    """Fingerprint of the frontend being served: changes on every deploy, and
+    locally whenever the static files are rebuilt (no restart needed)."""
+    pages = (STATIC_DIR / "index.html", STATIC_DIR / "app.html")
+    try:
+        stamp = tuple((p.stat().st_mtime_ns, p.stat().st_size) for p in pages)
+    except OSError:
+        return None
+    return _hash_pages(stamp)
+
+
+@lru_cache(maxsize=4)
+def _hash_pages(stamp: tuple) -> str:
+    pages = (STATIC_DIR / "index.html", STATIC_DIR / "app.html")
+    return hashlib.sha256(b"".join(p.read_bytes() for p in pages)).hexdigest()[:12]
+
+
+def _cookie(scope, name: str) -> str | None:
+    for key, value in scope.get("headers", []):
+        if key == b"cookie":
+            for part in value.decode("latin-1").split(";"):
+                k, _, v = part.strip().partition("=")
+                if k == name:
+                    return v
+    return None
+
+
 class CacheHeaders:
-    """Pages must be revalidated on every load; without a Cache-Control header
+    """Keeps browsers on the current build.
+
+    Pages must be revalidated on every load; without a Cache-Control header
     browsers cache them heuristically and keep showing the previous build after
     a deploy. The JS/CSS they point to have content-hashed names, so those can
-    be cached forever. Pure ASGI (not BaseHTTPMiddleware) so SSE streams from
-    the API pass through untouched -- the API is skipped entirely anyway."""
+    be cached forever.
+
+    Pages cached BEFORE that header existed are still out there, and a browser
+    serves them without asking the server -- which is why an old UI could
+    reappear "out of nowhere". Those stale pages still call the API, though, and
+    API calls always reach the server. So when a request comes from a browser
+    that hasn't loaded this build, the reply carries Clear-Site-Data: "cache",
+    which empties its HTTP cache: its next page load is the current build. A
+    `build` cookie marks browsers already up to date, so this happens once per
+    deploy, not on every request.
+
+    Pure ASGI (not BaseHTTPMiddleware) so SSE streams pass through untouched.
+    """
 
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        path = scope.get("path", "")
-        if scope["type"] != "http" or path.startswith(settings.api_prefix):
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        path = scope.get("path", "")
+        is_api = path.startswith(settings.api_prefix)
+        build = _build_id()
+        stale = build is not None and _cookie(scope, BUILD_COOKIE) != build
 
         async def send_with_cache(message):
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
+                is_page = headers.get("content-type", "").startswith("text/html")
                 if path.startswith("/_next/static/"):
                     headers["Cache-Control"] = "public, max-age=31536000, immutable"
-                elif headers.get("content-type", "").startswith("text/html"):
+                elif is_page:
                     headers["Cache-Control"] = "no-cache"
+                if stale and (is_api or is_page):
+                    if is_api:
+                        # Only API replies: a page reply is fresh by definition.
+                        headers.append("Clear-Site-Data", '"cache"')
+                    headers.append(
+                        "Set-Cookie",
+                        f"{BUILD_COOKIE}={build}; Path=/; Max-Age=31536000; SameSite=Lax"
+                        + ("; Secure" if settings.is_prod else ""),
+                    )
             await send(message)
 
         await self.app(scope, receive, send_with_cache)

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { I, Logo } from "@/components/Icons";
 import { Orb } from "@/components/Orb";
 import { Particles } from "@/components/Particles";
-import { api } from "@/lib/api";
+import { api, type User } from "@/lib/api";
 import { fingerprint } from "@/lib/fingerprint";
 
 const LOGIN = "/api/v1/auth/google/login";
@@ -48,6 +48,8 @@ export default function Landing() {
   const [failed, setFailed] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  // undefined while checking; null when signed out
+  const [me, setMe] = useState<User | null | undefined>(undefined);
   const root = useRef<HTMLDivElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
 
@@ -82,14 +84,26 @@ export default function Landing() {
     tilt.current?.style.setProperty("--rx", "0deg");
   }
 
-  // Render straight away and redirect only if already signed in: waiting on
-  // /me first meant a blank screen for the ~0.5s a Neon round trip takes.
+  // Signed-in visitors are no longer bounced straight into the app: this page
+  // is also the way back home, so it offers "Open your notes" instead.
   useEffect(() => {
     setFailed(new URLSearchParams(window.location.search).has("error"));
-    fetch("/api/v1/auth/me", { credentials: "include" })
-      .then((r) => { if (r.ok) window.location.replace("/app"); })
-      .catch(() => {});
+    const check = () =>
+      fetch("/api/v1/auth/me", { credentials: "include" })
+        .then(async (r) => setMe(r.ok ? await r.json() : null))
+        .catch(() => setMe(null));
+    check();
+    // Back/forward can restore this page from memory with an out-of-date
+    // signed-in state; ask again when that happens.
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) check(); };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
   }, []);
+
+  async function signOut() {
+    try { await api.logout(); } catch { /* already signed out */ }
+    setMe(null);
+  }
 
   async function tryFree() {
     setStarting(true);
@@ -108,6 +122,20 @@ export default function Landing() {
     ? <Orb wait="starting" theme="light" label="Setting up…" />
     : "Try it free";
 
+  const openLabel = me?.is_guest ? "Continue your trial" : "Open your notes";
+  const primaryCta = me ? (
+    <a className="lp-btn primary" href="/app">{openLabel} {I.arrow}</a>
+  ) : (
+    <button className="lp-btn primary" onClick={tryFree} disabled={starting} aria-busy={starting}>
+      {tryLabel} {!starting && I.arrow}
+    </button>
+  );
+  const secondaryCta = me && !me.is_guest ? (
+    <button className="lp-btn ghost" onClick={signOut}>Sign out</button>
+  ) : (
+    <a className="lp-btn ghost" href={LOGIN}>{I.google} Sign in with Google</a>
+  );
+
   return (
     <div className="lp" ref={root}>
       <header className="lp-nav">
@@ -118,8 +146,12 @@ export default function Landing() {
         <nav className="lp-links" aria-label="Main">
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
-          <a href={LOGIN}>Sign in</a>
-          <button className="lp-btn primary sm" onClick={tryFree} disabled={starting} aria-busy={starting}>{tryLabel}</button>
+          {(!me || me.is_guest) && <a href={LOGIN}>Sign in</a>}
+          {me ? (
+            <a className="lp-btn primary sm" href="/app">{me.is_guest ? "Continue trial" : "Open app"}</a>
+          ) : (
+            <button className="lp-btn primary sm" onClick={tryFree} disabled={starting} aria-busy={starting}>{tryLabel}</button>
+          )}
         </nav>
       </header>
 
@@ -137,11 +169,12 @@ export default function Landing() {
               shows the exact passage behind every sentence.
             </p>
             <div className="lp-ctas">
-              <button className="lp-btn primary" onClick={tryFree} disabled={starting} aria-busy={starting}>
-                {tryLabel} {!starting && I.arrow}
-              </button>
-              <a className="lp-btn ghost" href={LOGIN}>{I.google} Sign in with Google</a>
+              {primaryCta}
+              {secondaryCta}
             </div>
+            {me && !me.is_guest && (
+              <p className="lp-signed">Signed in as {me.display_name ?? me.email}</p>
+            )}
             <ul className="lp-checks">
               <li>{I.check} No sign-up to try</li>
               <li>{I.check} 1 document, 2 questions free</li>
@@ -204,10 +237,8 @@ export default function Landing() {
           <h2>Try it on your own notes</h2>
           <p>One document and two questions, free. No account needed.</p>
           <div className="lp-ctas center">
-            <button className="lp-btn primary" onClick={tryFree} disabled={starting} aria-busy={starting}>
-              {tryLabel} {!starting && I.arrow}
-            </button>
-            <a className="lp-btn ghost" href={LOGIN}>{I.google} Sign in with Google</a>
+            {primaryCta}
+            {secondaryCta}
           </div>
         </section>
       </main>

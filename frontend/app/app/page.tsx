@@ -247,6 +247,8 @@ export default function Workspace() {
             onTurnDone={() => { loadConversations(); if (user.is_guest) loadUser(); }}
             onFilesChanged={() => { loadFolders(); loadStorage(); if (user.is_guest) loadUser(); }}
             onNewChat={newChat}
+            // matches max_upload_mb / guest_max_upload_mb in backend config.py
+            uploadLimitMb={user.is_guest ? 5 : 20}
           />
         )}
       </main>

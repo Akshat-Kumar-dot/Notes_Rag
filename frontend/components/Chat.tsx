@@ -90,7 +90,7 @@ const FIRST_FOLDER = "My notes";
 
 export function Chat({
   folders, scopeFolderId, resumeId, onScopeChange, onConversationCreated,
-  onTurnDone, onFilesChanged, onNewChat,
+  onTurnDone, onFilesChanged, onNewChat, uploadLimitMb = 20,
 }: {
   folders: Folder[];
   /** The folder a NEW chat searches. Once a chat exists its scope is fixed. */
@@ -103,6 +103,8 @@ export function Chat({
   /** Uploads change folder counts, storage and a guest's credits. */
   onFilesChanged?: () => void;
   onNewChat: () => void;
+  /** Shown on the empty-folder screen: 20 MB, or 5 MB on the free trial. */
+  uploadLimitMb?: number;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
@@ -295,9 +297,11 @@ export function Chat({
     : !canAsk ? "Add a file to start asking…"
       : mode === "search" ? `Search ${scopeName}…` : "Ask your files…";
 
-  const composer = (
-    <div className="composer-wrap">
-      {uploads.length > 0 && (
+  // An empty folder gets one clear drop card instead of a composer that can't
+  // be used yet, mode buttons and a folder label all at once.
+  const starter = empty && !loading && !orphaned && !hasFiles;
+
+  const chips = uploads.length > 0 && (
         <div className="attach">
           {uploads.map((u) => (
             <div key={u.key} className="chip" data-s={u.status} title={u.error ?? u.name}>
@@ -315,15 +319,24 @@ export function Chat({
             </div>
           ))}
         </div>
-      )}
+  );
+
+  const folderPicker = fixedScope === null && folders.length > 1 ? (
+    <label className="scope">
+      {I.folder}
+      <select value={scopeFolderId ?? ""} onChange={(e) => onScopeChange(e.target.value)}
+        aria-label="Folder to ask across">
+        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+      </select>
+    </label>
+  ) : scopeName ? <div className="scope">{I.folder}<span>{scopeName}</span></div> : null;
+
+  const composer = (
+    <div className="composer-wrap">
+      {chips}
       <div className="composer">
         <button className="iconbtn ghost" onClick={() => picker.current?.click()}
           disabled={orphaned} title="Add files" aria-label="Add files">{I.plus}</button>
-        <input
-          ref={picker} type="file" multiple hidden
-          accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
-          onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
-        />
         <textarea
           ref={box} rows={1} value={value}
           placeholder={placeholder}
@@ -350,15 +363,7 @@ export function Chat({
         <button data-on={mode === "search"} onClick={() => setMode("search")}>Search Notes</button>
       </div>
       {/* A new chat can still change folder; an existing one cannot. */}
-      {fixedScope === null && folders.length > 1 ? (
-        <label className="scope">
-          {I.folder}
-          <select value={scopeFolderId ?? ""} onChange={(e) => onScopeChange(e.target.value)}
-            aria-label="Folder to ask across">
-            {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        </label>
-      ) : scopeName && <div className="scope">{I.folder}<span>{scopeName}</span></div>}
+      {folderPicker}
     </div>
   );
 
@@ -380,13 +385,18 @@ export function Chat({
         addFiles(e.dataTransfer.files);
       }}
     >
-      {dragging && (
+      <input
+        ref={picker} type="file" multiple hidden
+        accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
+        onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+      />
+      {dragging && !starter && (
         <div className="dropzone">
           <div>{I.upload}<span>Drop to add to <b>{scopeName || FIRST_FOLDER}</b></span></div>
         </div>
       )}
 
-      <div className="scroll" data-empty={empty}>
+      <div className="scroll" data-empty={empty} data-starter={starter}>
         {empty && loading ? (
           <div className="hero">
             <Orb wait="reading" size={32} label="Opening chat…" className="hero-wait" />
@@ -405,13 +415,26 @@ export function Chat({
                 <p>Asking across <strong>{scopeName}</strong></p>
               </>
             ) : (
-              <>
-                <h2>Add a document to get started</h2>
-                <p>PDFs, Word files, notes or images. Then ask anything about them.</p>
-                <button className="btn primary hero-btn" onClick={() => picker.current?.click()}>
-                  {I.upload} Add files
-                </button>
-              </>
+              <div className="starter-wrap">
+                <div
+                  className="starter" data-over={dragging} role="button" tabIndex={0}
+                  aria-label="Add files: drop them here or press Enter to browse"
+                  onClick={() => picker.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picker.current?.click(); }
+                  }}
+                >
+                  <span className="starter-ico">{I.upload}</span>
+                  <h2>{dragging ? "Drop to add them" : "Add your notes"}</h2>
+                  <p>Drag files here or <u>browse</u>. Then ask anything about them.</p>
+                  <div className="starter-types">
+                    <span>PDF</span><span>Word</span><span>Text</span><span>Markdown</span><span>Images</span>
+                  </div>
+                  <p className="starter-limit">Up to {uploadLimitMb} MB per file</p>
+                </div>
+                {chips}
+                {folderPicker && <div className="starter-scope">{folderPicker}</div>}
+              </div>
             )}
           </div>
         ) : (
@@ -487,11 +510,11 @@ export function Chat({
         )}
       </div>
 
-      {composer}
+      {!starter && composer}
 
       {/* Collapses to zero on the first question, which is what slides the
           composer from the middle of the screen down to the bottom. */}
-      <div className="drop-spacer" data-empty={empty} />
+      <div className="drop-spacer" data-empty={empty && !starter} />
     </div>
   );
 }

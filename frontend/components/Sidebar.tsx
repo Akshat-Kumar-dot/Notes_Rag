@@ -141,7 +141,10 @@ export function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : undefined}>
             <Logo size={26} />
           </button>
-          <span className="lbl brand-name wordmark grow"><b>notes</b>rag</span>
+          {/* Home: the landing page, where you can sign in with Google or out. */}
+          <a className="lbl brand-name wordmark grow" href="/" title="Home">
+            <b>notes</b>rag
+          </a>
           {!collapsed && (
             <button className="collapse" onClick={onToggleCollapse}
               title="Collapse sidebar" aria-label="Collapse sidebar">{I.panel}</button>
