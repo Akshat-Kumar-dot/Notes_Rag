@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "notes-rag",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd backend && .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --port 8000"],
+      "port": 8000,
+      "url": "http://localhost:8000"
+    },
+    {
+      "name": "notes-rag-worker",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd frontend && set WRANGLER_SEND_METRICS=false&& npx --yes wrangler@4 dev --port 8787 --var API_ORIGIN:http://127.0.0.1:8000 --var PROXY_SECRET:test-secret"],
+      "port": 8787,
+      "url": "http://localhost:8787"
+    }
+  ]
+}
