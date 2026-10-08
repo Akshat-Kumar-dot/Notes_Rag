@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     # TCP peer (local dev). Render sets it to 1 -- verify with the log line in
     # auth/guest.py after deploying: too high lets clients spoof their IP.
     trusted_proxy_hops: int = 0
+    # Shared with the Cloudflare Pages function that serves the frontend and
+    # forwards /api/* here (frontend/functions/api/[[path]].js). A request
+    # carrying it came through that function, so its X-Client-IP -- set from
+    # Cloudflare's CF-Connecting-IP, which visitors can't forge -- is the real
+    # visitor. Empty = no Cloudflare in front; only X-Forwarded-For is used.
+    proxy_secret: str = ""
 
     # --- ingest ---
     max_upload_mb: int = 20

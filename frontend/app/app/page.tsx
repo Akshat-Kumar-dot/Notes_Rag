@@ -29,6 +29,13 @@ export default function Workspace() {
   const [collapsed, setCollapsed] = useState(false);
   const [modal, setModal] = useState<ModalSpec | null>(null);
   const [drawer, setDrawer] = useState(false);
+  // Still loading after a few seconds almost always means the server was
+  // asleep (Render's free tier) and is starting up.
+  const [slowBoot, setSlowBoot] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlowBoot(true), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const loadFolders = useCallback(async () => {
     const list = await api.folders();
@@ -150,7 +157,8 @@ export default function Workspace() {
   if (!user) {
     return (
       <div className="boot">
-        <Orb wait="starting" size={64} label="Loading your workspace…" />
+        <Orb wait="starting" size={64}
+          label={slowBoot ? "Waking the server. After a quiet spell this takes up to a minute…" : "Loading your workspace…"} />
       </div>
     );
   }

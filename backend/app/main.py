@@ -10,12 +10,13 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from starlette.datastructures import MutableHeaders
+from starlette.datastructures import Headers, MutableHeaders
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import mongo
 from app.api import chat, files, folders, search, study
 from app.auth import google, guest
+from app.auth.guest import from_cloudflare
 from app.config import settings
 from app.db import engine
 
@@ -99,7 +100,12 @@ class CacheHeaders:
         path = scope.get("path", "")
         is_api = path.startswith(settings.api_prefix)
         build = _build_id()
-        stale = build is not None and _cookie(scope, BUILD_COOKIE) != build
+        # Through Cloudflare, pages come from Cloudflare Pages, which always
+        # revalidates HTML -- and its build differs from the copy baked in
+        # here, so comparing the two would clear caches for no reason.
+        proxied = from_cloudflare(Headers(scope=scope))
+        stale = (not proxied and build is not None
+                 and _cookie(scope, BUILD_COOKIE) != build)
 
         async def send_with_cache(message):
             if message["type"] == "http.response.start":

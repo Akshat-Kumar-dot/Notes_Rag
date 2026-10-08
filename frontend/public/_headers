@@ -1,0 +1,5 @@
+# Cloudflare Pages response headers (copied into out/ by `next build`).
+# Script and style files have content-hashed names, so they can be cached
+# forever. Pages always revalidates the HTML itself, so a deploy shows at once.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

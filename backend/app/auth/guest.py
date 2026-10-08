@@ -61,13 +61,33 @@ _BUSY = "Free trials are at capacity for today. Sign in with Google to keep goin
 # ------------------------------------------------------------- identifying
 
 
+def from_cloudflare(headers) -> bool:
+    """True if a request came through our Cloudflare Pages function: it carries
+    the shared secret. Compared in constant time."""
+    secret = settings.proxy_secret
+    sent = headers.get("x-proxy-secret", "")
+    return bool(secret) and hmac.compare_digest(sent.encode(), secret.encode())
+
+
 def client_ip(request: Request) -> str:
     """The caller's IP, without trusting anything the caller can forge.
 
-    Each trusted proxy appends the address it received the request from to
-    X-Forwarded-For. Entries to the left of those are whatever the client sent,
-    so read exactly `trusted_proxy_hops` entries from the right -- never the
-    leftmost, which anyone can set with one header."""
+    Through Cloudflare: Render only sees Cloudflare's addresses, so the Pages
+    function passes the visitor's IP in X-Client-IP, with the shared secret to
+    prove the header is ours. Without the secret it is ignored, so calling
+    Render directly can't fake an IP that way.
+
+    Directly: each trusted proxy appends the address it received the request
+    from to X-Forwarded-For. Entries to the left of those are whatever the
+    client sent, so read exactly `trusted_proxy_hops` entries from the right --
+    never the leftmost, which anyone can set with one header."""
+    if from_cloudflare(request.headers):
+        forwarded = request.headers.get("x-client-ip", "").strip()
+        try:
+            ipaddress.ip_address(forwarded)
+            return forwarded
+        except ValueError:
+            pass
     peer = request.client.host if request.client else "0.0.0.0"
     hops = settings.trusted_proxy_hops
     if hops <= 0:

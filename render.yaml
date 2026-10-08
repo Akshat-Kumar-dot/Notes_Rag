@@ -50,6 +50,11 @@ services:
       # app refuses to start in production without it.
       - key: MONGODB_URL
         sync: false
+      # Shared with the Cloudflare Pages function that serves the frontend
+      # (frontend/functions/api/[[path]].js); lets the backend trust the
+      # visitor IP it forwards. Same value in both places.
+      - key: PROXY_SECRET
+        sync: false
 
       # Set AFTER the first deploy to the real service URL (see notes above).
       # Leaving it blank on the first boot is fine; OAuth just won't work until set.

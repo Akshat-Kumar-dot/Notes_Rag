@@ -48,6 +48,7 @@ export default function Landing() {
   const [failed, setFailed] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [waking, setWaking] = useState(false);
   // undefined while checking; null when signed out
   const [me, setMe] = useState<User | null | undefined>(undefined);
   const root = useRef<HTMLDivElement>(null);
@@ -108,18 +109,25 @@ export default function Landing() {
   async function tryFree() {
     setStarting(true);
     setTrialError(null);
+    // The page itself comes from Cloudflare instantly, but the server sleeps
+    // after 15 quiet minutes and takes up to a minute to wake. Say so, rather
+    // than let a long "Setting up…" look stuck.
+    const slow = window.setTimeout(() => setWaking(true), 4000);
     try {
       await api.startGuest(await fingerprint());
       window.location.replace("/app");
     } catch (e) {
       setTrialError(e instanceof Error ? e.message : "Couldn't start a free trial.");
       setStarting(false);
+    } finally {
+      window.clearTimeout(slow);
+      setWaking(false);
     }
   }
 
   // On the white button, so the orb draws dark ink (theme "light").
   const tryLabel = starting
-    ? <Orb wait="starting" theme="light" label="Setting up…" />
+    ? <Orb wait="starting" theme="light" label={waking ? "Waking the server…" : "Setting up…"} />
     : "Try it free";
 
   const openLabel = me?.is_guest ? "Continue your trial" : "Open your notes";
