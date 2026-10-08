@@ -17,7 +17,7 @@
   },
   "vars": {
     // Your Render service's address, with no trailing slash.
-    "API_ORIGIN": "https://YOUR-SERVICE.onrender.com"
+    "API_ORIGIN": "https://notes-rag.onrender.com/"
   }
   // PROXY_SECRET is a secret, not a var:   npx wrangler secret put PROXY_SECRET
 }
