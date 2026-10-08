@@ -1,25 +1,39 @@
 /**
- * Cloudflare Pages Function: forwards every /api/* request to the backend on
- * Render.
+ * Cloudflare Worker: serves the frontend and forwards /api/* to Render.
  *
- * Cloudflare serves the pages instantly from near each visitor; this function
- * passes the API calls through. To the browser everything stays on ONE site, so
- * the sign-in cookie, Google login and streamed answers keep working with no
- * CORS setup -- a page on Cloudflare calling the Render address directly would
- * make the login cookie third-party, which browsers block.
+ * Pages (the built files in out/) are served by Cloudflare's static assets
+ * directly -- wrangler.jsonc sends only /api/* to this script -- so they load
+ * instantly from near each visitor, even while the Render server is asleep.
  *
- * Set in Cloudflare Pages -> Settings -> Variables and secrets (Production):
- *   API_ORIGIN    e.g. https://note-rag.onrender.com   (no trailing slash)
- *   PROXY_SECRET  the same random value as PROXY_SECRET on Render
+ * API calls are passed through to Render. To the browser everything stays on
+ * ONE site, so the sign-in cookie, Google login and streamed answers keep
+ * working with no CORS setup -- a page calling the Render address directly
+ * would make the login cookie third-party, which browsers block.
+ *
+ * Config (see wrangler.jsonc):
+ *   API_ORIGIN    var     the Render address, e.g. https://note-rag.onrender.com
+ *   PROXY_SECRET  secret  `npx wrangler secret put PROXY_SECRET`; same value as
+ *                         PROXY_SECRET on Render
  *
  * Plain JS on purpose: Next's type-check covers every .ts file in frontend/,
  * and this file runs on Cloudflare, not in Next.
  */
-export async function onRequest({ request, env }) {
-  if (!env.API_ORIGIN) {
-    return Response.json({ detail: "API_ORIGIN is not set in Cloudflare Pages." }, { status: 500 });
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/")) return forward(request, env, url);
+    // Only reached if run_worker_first is ever widened; pages come from assets.
+    return env.ASSETS.fetch(request);
+  },
+};
+
+async function forward(request, env, url) {
+  if (!env.API_ORIGIN || env.API_ORIGIN.includes("YOUR-SERVICE")) {
+    return Response.json(
+      { detail: "API_ORIGIN is not set: put your Render address in frontend/wrangler.jsonc." },
+      { status: 500 },
+    );
   }
-  const url = new URL(request.url);
   const target = new URL(url.pathname + url.search, env.API_ORIGIN);
 
   const headers = new Headers(request.headers);

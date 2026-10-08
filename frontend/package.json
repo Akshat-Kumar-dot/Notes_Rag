@@ -1,7 +1,10 @@
 {
   "name": "notes-rag-web",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "lint": "next lint" },
+  "scripts": {
+    "dev": "next dev", "build": "next build", "lint": "next lint",
+    "deploy": "next build && npx wrangler deploy"
+  },
   "dependencies": { "next": "15.1.4", "react": "19.0.0", "react-dom": "19.0.0", "thinking-orbs": "0.3.2" },
   "devDependencies": {
     "@types/node": "22.10.5", "@types/react": "19.0.4",

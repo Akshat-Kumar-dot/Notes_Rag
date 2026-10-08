@@ -8,3 +8,4 @@ static/
 .venv/
 venv/
 .git.old/
+.wrangler/
