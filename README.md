@@ -121,32 +121,6 @@ Open http://localhost:8000.
 
 The Google OAuth redirect URI has to be `<PUBLIC_BASE_URL>/api/v1/auth/google/callback`.
 
-## Deploying
-
-There are two parts.
-
-**The API on Render.** Create the service from `render.yaml` (New → Blueprint)
-and it will ask for the secrets. Keep the region the same as your Neon
-database, or every query gets slower. Migrations run on boot. If `ENV=prod` and
-`MONGODB_URL` is missing, the app refuses to start on purpose.
-
-**The frontend on Cloudflare.** `frontend/wrangler.jsonc` serves the static
-site and forwards `/api/*` to Render. Put your Render address in `API_ORIGIN`,
-then from `frontend/`:
-
-```bash
-npx wrangler secret put PROXY_SECRET
-```
-
-```bash
-npm run deploy
-```
-
-If Workers Builds is connected to the repo (root folder `frontend`), pushing
-to GitHub deploys it for you.
-
-Health check: `/api/v1/health` should return `"ok": true` with `"env": "prod"`.
-
 ## Tests
 
 ```bash
