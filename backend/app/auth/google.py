@@ -21,6 +21,7 @@ from app.auth.session import (
     COOKIE_NAME,
     clear_session_cookie,
     create_session,
+    resolve_session,
     revoke_session,
     set_session_cookie,
 )
@@ -52,6 +53,13 @@ async def google_callback(request: Request, db: DB):
         token = await oauth.google.authorize_access_token(request)
     except OAuthError as exc:
         log.warning("oauth callback failed: %s", exc)
+        # A callback replayed (Back button, a second tab) or cancelled at Google
+        # while already signed in: nothing is lost, so go on to the app rather
+        # than report a failed sign-in over a session that works.
+        existing = request.cookies.get(COOKIE_NAME)
+        current = await resolve_session(db, existing) if existing else None
+        if current is not None and not current.is_guest:
+            return RedirectResponse("/app", status_code=303)
         return RedirectResponse("/?error=signin_failed", status_code=303)
 
     claims = token.get("userinfo") or {}

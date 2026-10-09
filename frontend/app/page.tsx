@@ -136,7 +136,16 @@ export default function Landing() {
   // Signed-in visitors are no longer bounced straight into the app: this page
   // is also the way back home, so it offers "Open your notes" instead.
   useEffect(() => {
-    setFailed(new URLSearchParams(window.location.search).has("error"));
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("error")) {
+      setFailed(true);
+      // Say it once, then drop it from the address: otherwise a refresh, the
+      // Back button or the browser's history suggestions bring the message
+      // back long after the sign-in it was about.
+      params.delete("error");
+      const rest = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : "") + window.location.hash);
+    }
     const check = () =>
       fetch("/api/v1/auth/me", { credentials: "include" })
         .then(async (r) => setMe(r.ok ? await r.json() : null))
@@ -238,7 +247,10 @@ export default function Landing() {
               <li>{I.check} 1 document, 2 questions free</li>
               <li>{I.check} Every answer cited</li>
             </ul>
-            {failed && <p className="note err lp-note">Sign-in didn&apos;t complete. Try again.</p>}
+            {/* not over a sign-in that works */}
+            {failed && !(me && !me.is_guest) && (
+              <p className="note err lp-note">Sign-in didn&apos;t complete. Try again.</p>
+            )}
             {trialError && <p className="note err lp-note">{trialError}</p>}
           </div>
 
