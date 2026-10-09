@@ -40,6 +40,8 @@ button { background: none; border: 0; cursor: pointer; }
   /* Wide column: on a 1920px screen the page should use the screen, not sit
      in a narrow strip down the middle. The gutter grows with the viewport. */
   --lp-max: 1560px;
+  --lp-nav-h: 76px;
+  --lp-edge: clamp(16px, 2.8vw, 44px);   /* the top bar and last screen sit this far from the edges */
   --lp-gut: clamp(24px, 4vw, 72px);
   --lp-bg: #0c0c0d;
   --lp-line: #232327;
@@ -55,20 +57,32 @@ button { background: none; border: 0; cursor: pointer; }
 }
 .lp a { color: inherit; text-decoration: none; }
 
+/* a slim bar with no background (after lenis.dev): sections left, the logo
+   centred, account right. Over the white part of the page its text turns dark
+   (data-light, set from app/page.tsx). */
 .lp-nav {
-  position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
-  justify-content: space-between; gap: 16px;
-  /* full-bleed background; content lines up with the --lp-max column below */
-  padding: 18px max(var(--lp-gut), calc((100% - var(--lp-max)) / 2 + var(--lp-gut)));
-  background: rgba(12, 12, 13, 0.78);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 10; display: grid; align-items: center; gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); height: var(--lp-nav-h);
+  padding: 0 var(--lp-edge);
+  color: #f2f2f2; transition: color 0.3s;
 }
-.lp-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; letter-spacing: -0.01em; }
+.lp-nav[data-light] { color: #0b0b0c; }
+.lp-nav[data-light] .lp-links a:hover { color: #6a6a72; }
+.lp-nav[data-light] .lp-btn.primary { background: #0b0b0c; color: #f5f5f5; }
+.lp-nav[data-light] .lp-btn.primary:hover:not(:disabled) { background: #26262a; color: #f5f5f5; }
+.lp-brand { display: inline-flex; align-items: center; gap: 12px; font-size: 26px; letter-spacing: -0.01em; }
 .lp-brand b { font-weight: 700; }
 .lp-brand span { font-weight: 400; }
 .lp-brand.small { font-size: 14px; gap: 8px; }
-.lp-links { display: flex; align-items: center; gap: 34px; font-size: 14.5px; color: #d4d4d8; }
-.lp-links a:hover { color: #fff; }
+.lp-links {
+  display: flex; align-items: center; gap: 42px;
+  font-size: 19px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.lp-links a:hover { color: #9a9aa2; }
+.lp-left { justify-self: start; }
+.lp-right { justify-self: end; }
+.lp-nav .lp-btn.sm { height: 46px; padding: 0 22px; border-radius: 8px; font-size: 17px; font-weight: 700; letter-spacing: 0.03em; }
+.lp-nav .lp-btn.sm:hover { color: #0b0b0c; }
 
 .lp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
@@ -92,7 +106,7 @@ button { background: none; border: 0; cursor: pointer; }
   gap: clamp(48px, 6vw, 120px); max-width: var(--lp-max); margin: 0 auto;
   padding: 64px var(--lp-gut) 96px;
   /* fill the first screen, so a 1080p display opens on the hero alone */
-  min-height: calc(100dvh - 76px);
+  min-height: calc(100dvh - var(--lp-nav-h));
   position: relative;
 }
 .lp-hero > :not(.lp-particles) { position: relative; z-index: 1; }
@@ -251,6 +265,8 @@ button { background: none; border: 0; cursor: pointer; }
   .lp-steps { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
+  .lp-left { display: none; }
+  .lp-nav { grid-template-columns: minmax(0, 1fr) auto; }
   .lp-links a[href^="#"] { display: none; }
   .lp-links { gap: 18px; }
   .lp-grid { grid-template-columns: minmax(0, 1fr); }
@@ -277,6 +293,182 @@ button { background: none; border: 0; cursor: pointer; }
   transition-delay: calc(var(--d, 0) * 90ms);
 }
 .lp-reveal-ready [data-reveal].in { opacity: 1; transform: none; }
+
+/* Lenis smooth scroll (rules from lenis/dist/lenis.css) */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* ---------- landing: "Enter notesrag." zoom ----------
+   A tall section with a screen-high sticky inside: scrolling through the
+   extra height is what drives the zoom (components/ZoomEnter.tsx). */
+.zoom { position: relative; height: 260vh; }
+.zoom-pin {
+  position: sticky; top: 0; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+}
+.zoom-lines {
+  display: flex; flex-direction: column; align-items: center; will-change: opacity, transform;
+  font-size: clamp(38px, 7vw, 124px); font-weight: 700; line-height: 0.92;
+  letter-spacing: -0.045em; text-transform: uppercase; color: #f5f5f5;
+}
+.zoom-lines.low { color: #55555d; }
+.zoom-word {
+  display: flex; flex-direction: column; align-items: center; margin: 0.35em 0;
+  line-height: 1;
+}
+.zoom-enter {
+  font-size: clamp(12px, 1.2vw, 18px); letter-spacing: 0.32em; text-transform: uppercase;
+  color: var(--lp-soft); margin-bottom: 0.9em;
+}
+.zoom-mark { font-size: clamp(60px, 11vw, 196px); font-weight: 400; letter-spacing: -0.05em; color: #f5f5f5; }
+.zoom-mark b { font-weight: 700; }
+/* the full stop the camera flies into */
+.zoom-dot {
+  display: inline-block; width: 0.17em; height: 0.17em; margin-left: 0.05em;
+  border-radius: 50%; background: var(--lp-green);
+}
+/* the white the full stop grows into (clip-path set from JS) */
+.zoom-flood {
+  position: absolute; inset: 0; background: var(--paper); opacity: 0; pointer-events: none;
+  clip-path: circle(0px at 50% 50%);
+}
+
+/* ---------- landing: "brings the receipts" chrome page stack ----------
+   A tall section with a screen-high sticky inside. The WebGL pages fill the
+   sticky; numbered cards cascade in over it, top-left to bottom-right, and at
+   the very end big text takes over: the last screen of the page
+   (components/NoteStack.tsx). After the zoom the page turns white here. */
+.lp { --paper: #f4f4f5; --tint: #dcefe3; --expo: cubic-bezier(0.19, 1, 0.22, 1); }
+.paper {
+  --sec-h: 1020vh; position: relative; height: var(--sec-h); background: var(--paper); color: #0b0b0c;
+  /* Starts over the zoom's last stretch, which is already plain white: the first
+     sheet comes up sooner, and there's no hairline of the dark page between them. */
+  margin-top: -25vh;
+}
+/* white at the top, tinting to a soft green at the bottom of the screen
+   (the warm sand it was before: --tint: #f1e5d7) */
+.paper-pin {
+  position: sticky; top: 0; height: 100vh; overflow: hidden;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper) 30%, var(--tint) 100%);
+}
+.paper-motes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.paper-gl { position: absolute; inset: 0; }
+.paper-gl canvas { display: block; width: 100%; height: 100%; }
+/* where "Features" in the top bar scrolls to: the first feature card */
+.paper-anchor { position: absolute; left: 0; top: calc(60vh + (var(--sec-h) - 160vh) * 0.56); }
+
+/* lines of big type that slide up into view (data-on on the block or its parent) */
+.rise > span { display: block; overflow: hidden; padding-bottom: 0.04em; }
+.rise > span > span { display: block; transform: translateY(105%); transition: transform 1.2s var(--expo); }
+.rise > span + span > span { transition-delay: 0.15s; }
+.rise > span:nth-child(3) > span { transition-delay: 0.3s; }
+.rise[data-on] > span > span, [data-on] > .rise > span > span { transform: none; }
+
+.lp .paper-h {
+  position: absolute; z-index: 2; top: calc(var(--lp-nav-h) + 3vh); right: var(--lp-edge); text-align: right;
+  font-size: clamp(26px, 2.9vw, 54px); font-weight: 800; line-height: 0.92;
+  letter-spacing: -0.05em; text-transform: uppercase;
+}
+.paper-h > span + span > span { color: #b3b3b8; }
+/* a few words beside the first sheet, before the cards come */
+.lp .paper-lede {
+  position: absolute; z-index: 2; left: var(--lp-edge); bottom: 16vh; max-width: 42vw;
+  font-size: clamp(20px, 1.9vw, 34px); font-weight: 600; line-height: 1.2; letter-spacing: -0.025em;
+}
+.paper-lede em { font-style: normal; color: #2fae66; }
+.paper-cards {
+  --count: 8; --card: clamp(250px, 21vw, 400px); --top: calc(var(--lp-nav-h) + 26px); --pad: var(--lp-edge);
+  position: absolute; inset: 0; z-index: 1; list-style: none; pointer-events: none;
+}
+/* each card lands one step further down and to the right than the last */
+.paper-card {
+  position: absolute; width: var(--card); aspect-ratio: 1;
+  top: calc(var(--top) + (100vh - var(--top) - var(--card) - var(--pad)) / (var(--count) - 1) * var(--i));
+  left: calc(var(--pad) + (48vw - var(--card)) / (var(--count) - 1) * var(--i));
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: clamp(18px, 1.6vw, 28px); border: 1px solid #161618;
+  background: rgba(246, 245, 243, 0.8);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; transform: translate(40%, 40%);
+  transition: opacity 1.2s var(--expo), transform 1.2s var(--expo);
+}
+.paper-card[data-on] { opacity: 1; transform: none; }
+/* and at the end they all leave, back up and away */
+.paper-card[data-gone] { opacity: 0; transform: translate(-30%, -30%); transition-duration: 0.8s; }
+.paper-n {
+  font-size: clamp(56px, 5.8vw, 112px); font-weight: 800; line-height: 0.86;
+  letter-spacing: -0.05em; color: #2fae66; font-variant-numeric: tabular-nums;
+}
+.lp .paper-card h3 {
+  margin: 0; font-size: clamp(18px, 1.55vw, 28px); font-weight: 800; line-height: 1.02;
+  letter-spacing: -0.02em; text-transform: uppercase;
+}
+.paper-card p { margin-top: 10px; color: #55555c; font-size: clamp(13.5px, 0.9vw, 16px); line-height: 1.5; }
+
+/* the last screen (after lenis.dev's "Lenis is open source") */
+.paper-end { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.lp .paper-big {
+  position: absolute; margin: 0; font-weight: 800; line-height: 0.88;
+  letter-spacing: -0.055em; text-transform: uppercase;
+}
+.lp .paper-big.top { top: calc(var(--lp-nav-h) + 10px); left: var(--lp-edge); font-size: clamp(44px, 6.6vw, 128px); }
+.paper-big.top > span + span > span { color: #2fae66; }
+.lp .paper-big.bottom {
+  right: var(--lp-edge); bottom: 76px; text-align: right; font-size: clamp(36px, 5.4vw, 104px);
+}
+.paper-cta {
+  position: absolute; left: var(--lp-edge); bottom: 82px;
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.8s var(--expo) 0.3s, transform 0.8s var(--expo) 0.3s;
+}
+.paper-cta .lp-btn.primary { background: #0b0b0c; color: #f5f5f5; }
+.paper-cta .lp-btn.primary:hover:not(:disabled) { background: #26262a; }
+.paper-foot {
+  position: absolute; left: var(--lp-edge); right: var(--lp-edge); bottom: 22px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px 24px; flex-wrap: wrap;
+  font-size: 13.5px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+  opacity: 0; transition: opacity 0.8s var(--expo) 0.4s;
+}
+.paper-foot > div { display: flex; flex-wrap: wrap; gap: 12px 34px; }
+.paper-foot a:hover { color: #6a6a72; }
+.paper-end[data-on] .paper-cta { opacity: 1; transform: none; pointer-events: auto; }
+.paper-end[data-on] .paper-foot { opacity: 1; pointer-events: auto; }
+
+@media (max-width: 960px) {
+  .paper { --sec-h: 880vh; }
+  .lp .paper-lede { left: 16px; right: 16px; bottom: 12vh; max-width: none; font-size: 22px; }
+  .lp .paper-h { top: calc(var(--lp-nav-h) + 12px); left: 16px; right: 16px; font-size: 26px; }
+  /* phones: the pages turn in the top half, the cards pile up below them */
+  .paper-card {
+    left: 16px; width: calc(100% - 32px); aspect-ratio: auto; min-height: 150px; gap: 16px;
+    top: calc(52vh + var(--i) * 3vh); padding: 18px;
+  }
+  .paper-n { font-size: 44px; }
+  .lp .paper-big.top { font-size: 44px; }
+  .lp .paper-big.bottom { bottom: 172px; font-size: 36px; }
+  .paper-cta { bottom: 96px; }
+  .paper-foot { font-size: 12px; bottom: 18px; }
+  .paper-foot > div { gap: 10px 20px; }
+}
+
+/* Reduce motion: the scenes lie flat, already at their last frame. */
+.lp[data-still] .zoom, .lp[data-still] .paper { height: auto; }
+.lp[data-still] .zoom-pin { position: relative; height: auto; min-height: 100vh; }
+.lp[data-still] .paper-pin {
+  position: relative; height: auto; display: grid; gap: 28px; padding: 120px var(--lp-edge) 40px;
+}
+.lp[data-still] .paper-gl { position: relative; height: 60vh; }
+.lp[data-still] .paper-h, .lp[data-still] .paper-lede { position: static; max-width: none; }
+.lp[data-still] .rise > span > span { transform: none; }
+.lp[data-still] .paper-cards {
+  position: static; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.lp[data-still] .paper-card { position: relative; top: auto; left: auto; width: auto; opacity: 1; transform: none; }
+.lp[data-still] .paper-end { position: static; display: grid; gap: 28px; }
+.lp[data-still] .paper-end > * { position: static; opacity: 1; transform: none; text-align: left; pointer-events: auto; }
 
 /* thinking orbs: every wait in the app goes through components/Orb.tsx */
 .orb { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { I, Logo } from "@/components/Icons";
+import { NoteStack } from "@/components/NoteStack";
 import { Orb } from "@/components/Orb";
 import { Particles } from "@/components/Particles";
+import { ZOOM_WHITE, ZoomEnter } from "@/components/ZoomEnter";
 import { api, type User } from "@/lib/api";
 import { fingerprint } from "@/lib/fingerprint";
 
@@ -53,6 +55,52 @@ export default function Landing() {
   const [me, setMe] = useState<User | null | undefined>(undefined);
   const root = useRef<HTMLDivElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
+  const nav = useRef<HTMLElement>(null);
+
+  // Smooth scrolling (Lenis), on this page only. Skipped for anyone who asks
+  // their device to reduce motion -- they also get the scroll scenes laid out
+  // flat instead of pinned (data-still, see globals.css).
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      root.current?.setAttribute("data-still", "");
+      return;
+    }
+    let lenis: { destroy(): void } | null = null;
+    let gone = false;
+    import("lenis").then(({ default: Lenis }) => {
+      if (!gone) lenis = new Lenis({ autoRaf: true, anchors: true });
+    });
+    return () => { gone = true; lenis?.destroy(); };
+  }, []);
+
+  // The top bar has no background of its own, so over the white part of the
+  // page (the end of the zoom, and the page stack) its text turns dark.
+  useEffect(() => {
+    const el = root.current, bar = nav.current;
+    if (!el || !bar) return;
+    const zoom = el.querySelector<HTMLElement>(".zoom"), paper = el.querySelector<HTMLElement>(".paper");
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const y = bar.offsetHeight / 2;
+      const under = (s: HTMLElement | null) => {
+        const r = s?.getBoundingClientRect();
+        return r && r.top <= y && r.bottom >= y ? r : null;
+      };
+      const z = under(zoom), travel = z ? z.height - window.innerHeight : 0;
+      const zoomWhite = !!z && (el.hasAttribute("data-still") || (travel > 0 && -z.top / travel >= ZOOM_WHITE));
+      bar.toggleAttribute("data-light", zoomWhite || !!under(paper));
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    check();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // Sections ease in as they scroll into view. The hidden starting state is
   // only applied once this runs, so without JavaScript everything just shows.
@@ -146,14 +194,16 @@ export default function Landing() {
 
   return (
     <div className="lp" ref={root}>
-      <header className="lp-nav">
-        <a className="lp-brand" href="/" aria-label="Notes Rag home">
-          <Logo size={26} />
-          <span><b>notes</b>rag</span>
-        </a>
-        <nav className="lp-links" aria-label="Main">
+      <header className="lp-nav" ref={nav}>
+        <nav className="lp-links lp-left" aria-label="Sections">
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
+        </nav>
+        <a className="lp-brand" href="/" aria-label="Notes Rag home">
+          <Logo size={30} />
+          <span><b>notes</b>rag</span>
+        </a>
+        <nav className="lp-links lp-right" aria-label="Account">
           {(!me || me.is_guest) && <a href={LOGIN}>Sign in</a>}
           {me ? (
             <a className="lp-btn primary sm" href="/app">{me.is_guest ? "Continue trial" : "Open app"}</a>
@@ -197,76 +247,20 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="lp-section" id="how">
-          <h2 data-reveal>How it works</h2>
-          <p className="lp-lead" data-reveal>Three steps, and no answer you can&apos;t check.</p>
-          <ol className="lp-steps">
-            <li data-reveal style={{ "--d": 0 } as React.CSSProperties}>
-              <span className="lp-step-ico">{I.upload}</span>
-              <h3>Upload</h3>
-              <p>PDFs, Word documents, text, Markdown and images. Group them into folders by course or project.</p>
-            </li>
-            <li data-reveal style={{ "--d": 1 } as React.CSSProperties}>
-              <span className="lp-step-ico">{I.chat}</span>
-              <h3>Ask</h3>
-              <p>Ask in plain language. Follow-ups understand the conversation, so &ldquo;what about the second one?&rdquo; works.</p>
-            </li>
-            <li data-reveal style={{ "--d": 2 } as React.CSSProperties}>
-              <span className="lp-step-ico">{I.quote}</span>
-              <h3>Check</h3>
-              <p>Every answer lists the passages it used, with file and page, so you can verify it in seconds.</p>
-            </li>
-          </ol>
-        </section>
+        <ZoomEnter />
 
-        <section className="lp-section" id="features">
-          <h2 data-reveal>Built for studying, not guessing</h2>
-          <div className="lp-grid">
-            <Feature n={0} icon={I.db} title="Finds meaning and exact words">
-              Hybrid search combines semantic matching with keyword search, so names, formulas
-              and course codes are found too.
-            </Feature>
-            <Feature n={1} icon={I.chat} title="Says when it doesn't know">
-              If your files don&apos;t cover a question, the answer is flagged as low confidence
-              instead of confidently made up.
-            </Feature>
-            <Feature n={2} icon={I.search} title="Search without AI">
-              Search Notes returns the matching passages only. Nothing is generated, nothing is
-              invented.
-            </Feature>
-            <Feature n={3} icon={I.folder} title="Scoped by folder">
-              Each chat is tied to the folders you pick, so an answer about one course never
-              leaks in from another.
-            </Feature>
-          </div>
-        </section>
-
-        <section className="lp-final" data-reveal>
-          <h2>Try it on your own notes</h2>
-          <p>One document and two questions, free. No account needed.</p>
-          <div className="lp-ctas center">
-            {primaryCta}
-            {secondaryCta}
-          </div>
-        </section>
+        <NoteStack
+          cta={primaryCta}
+          foot={<>
+            <div>
+              <a href="#how">How it works</a>
+              <a href="#features">Features</a>
+              {(!me || me.is_guest) && <a href={LOGIN}>Sign in</a>}
+            </div>
+            <span>Answers from your notes, with sources</span>
+          </>}
+        />
       </main>
-
-      <footer className="lp-foot">
-        <span className="lp-brand small"><Logo size={16} /><span><b>notes</b>rag</span></span>
-        <span>Answers from your documents, with sources.</span>
-      </footer>
-    </div>
-  );
-}
-
-function Feature({ n, icon, title, children }: {
-  n: number; icon: React.ReactNode; title: string; children: React.ReactNode;
-}) {
-  return (
-    <div className="lp-feature" data-reveal style={{ "--d": n } as React.CSSProperties}>
-      <span className="lp-step-ico">{icon}</span>
-      <h3>{title}</h3>
-      <p>{children}</p>
     </div>
   );
 }
