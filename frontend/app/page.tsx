@@ -200,7 +200,7 @@ export default function Landing() {
           <a href="#features">Features</a>
         </nav>
         <a className="lp-brand" href="/" aria-label="Notes Rag home">
-          <Logo size={30} />
+          <Logo size={26} />
           <span><b>notes</b>rag</span>
         </a>
         <nav className="lp-links lp-right" aria-label="Account">
