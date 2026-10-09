@@ -18,6 +18,15 @@
   "vars": {
     // Your Render service's address, with no trailing slash.
     "API_ORIGIN": "https://notes-rag.onrender.com/"
+  },
+  // Preview builds: every branch except main gets its own preview URL. There is
+  // no separate staging server, so previews talk to the live one (live data).
+  // Google sign-in only returns to the main address, so on a preview use the
+  // free trial instead.
+  "previews": {
+    "vars": {
+      "API_ORIGIN": "https://notes-rag.onrender.com/"
+    }
   }
   // PROXY_SECRET is a secret, not a var:   npx wrangler secret put PROXY_SECRET
 }
