@@ -13,7 +13,7 @@ question
   │     filter : user_id AND folder_id = ANY(...)
   ├─ confidence gate              best dense score < 0.30 -> flag
   ├─ emit `sources` SSE event     UI renders citations here
-  └─ stream `token` events        Gemini Flash
+  └─ stream `token` events        Gemma 4
         └─ persist message + citation rows (with snapshots)
 ```
 

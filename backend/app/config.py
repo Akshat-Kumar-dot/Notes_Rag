@@ -27,14 +27,17 @@ class Settings(BaseSettings):
 
     session_ttl_days: int = 30
 
-    # --- Gemini (embeddings + generation) ---
+    # --- Gemini API (Gemini embeddings, Gemma 4 answers) ---
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     embedding_model: str = "gemini-embedding-001"
     # Gemini supports reduced output dims. 768 keeps vectors small -- Neon's free
     # tier is ~0.5GB and a vector is bigger than the text it came from.
     embedding_dim: int = 768
-    chat_model: str = "gemini-2.5-flash"
+    # Gemma 4, the open-weights model, served through the Gemini API. The 26B
+    # mixture-of-experts variant (4B active) answers in ~2s; gemma-4-31b-it
+    # works too but takes 30s+.
+    chat_model: str = "gemma-4-26b-a4b-it"
 
     # --- MongoDB (chat history) ---
     # Local default; on Render set MONGODB_URL to the Atlas connection string.

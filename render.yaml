@@ -26,7 +26,7 @@ services:
       - key: ENV
         value: prod
       - key: CHAT_MODEL
-        value: gemini-flash-lite-latest
+        value: gemma-4-26b-a4b-it
       # Render's proxy appends the caller's IP to X-Forwarded-For; the guest
       # trial reads that entry. After deploying, start one trial and check the
       # "guest start: ... resolved=" log line shows YOUR public IP.

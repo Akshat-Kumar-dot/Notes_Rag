@@ -27,6 +27,10 @@ def _body(prompt: str, max_tokens: int, json_mode: bool = False) -> dict:
     if json_mode:
         # Makes the model return a bare JSON document, no prose or fences.
         config["responseMimeType"] = "application/json"
+    if settings.chat_model.startswith("gemma-4"):
+        # Gemma 4 thinks before answering by default, and the thinking spends
+        # maxOutputTokens. "minimal" is the only level it accepts; it skips it.
+        config["thinkingConfig"] = {"thinkingLevel": "minimal"}
     return {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": config}
 
 
@@ -59,6 +63,9 @@ async def stream(prompt: str, max_tokens: int = 1200) -> AsyncIterator[str]:
                     except (json.JSONDecodeError, KeyError, IndexError):
                         continue
                     for part in parts:
+                        # Thought parts are the model's reasoning, not the answer.
+                        if part.get("thought"):
+                            continue
                         if text := part.get("text"):
                             yield text
         except httpx.HTTPError as exc:
@@ -84,6 +91,8 @@ async def complete(
     if resp.status_code >= 400:
         raise LLMError(f"The model returned an error (HTTP {resp.status_code}).")
     try:
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        parts = resp.json()["candidates"][0]["content"]["parts"]
+        # Gemma 4 puts an (empty) thought part first, so parts[0] isn't the answer.
+        return "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
     except (KeyError, IndexError):
         raise LLMError("The model returned an unexpected response.") from None
