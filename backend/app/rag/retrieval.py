@@ -64,6 +64,9 @@ sparse AS (
     FROM chunks c
     WHERE c.user_id = :user_id AND c.folder_id = ANY(:folder_ids)
       AND c.tsv @@ websearch_to_tsquery('english', :qtext)
+    -- The window's ORDER BY only numbers rows; without this one LIMIT keeps an
+    -- arbitrary sparse_k matches and can drop the best keyword hits.
+    ORDER BY ts_rank_cd(c.tsv, websearch_to_tsquery('english', :qtext)) DESC
     LIMIT :sparse_k
 ),
 fused AS (
