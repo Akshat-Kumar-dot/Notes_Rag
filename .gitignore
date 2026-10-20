@@ -9,3 +9,4 @@ static/
 venv/
 .git.old/
 .wrangler/
+.claude/
