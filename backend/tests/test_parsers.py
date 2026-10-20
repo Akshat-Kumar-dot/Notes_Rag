@@ -1,3 +1,4 @@
+import codecs
 import io
 
 import pytest
@@ -40,3 +41,29 @@ def test_docx_paragraphs_and_tables():
 def test_legacy_doc_gives_actionable_error():
     with pytest.raises(ParseError, match="docx"):
         word.parse(b"\xd0\xcf\x11\xe0legacy-ole-header")
+
+
+NOTE = "# Exam notes\n\nThe TCP handshake is SYN, SYN-ACK, ACK — in that order."
+
+
+@pytest.mark.parametrize("encoding", ["utf-8-sig", "utf-16", "utf-16-be", "utf-32"])
+def test_bom_encodings_decode_cleanly(encoding):
+    """Notepad and PowerShell on Windows write UTF-8 with a BOM and UTF-16."""
+    data = NOTE.encode(encoding)
+    if encoding == "utf-16-be":
+        data = codecs.BOM_UTF16_BE + data
+    assert plaintext.parse(data).text == NOTE
+
+
+def test_bom_does_not_hide_the_first_heading():
+    from app.rag.chunking import chunk_pages
+
+    r = plaintext.parse(NOTE.encode("utf-16"))
+    chunks = chunk_pages(r.pages, size=400, overlap=50)
+    assert chunks[0].heading == "Exam notes"
+
+
+def test_nul_bytes_rejected_with_a_clear_message():
+    # UTF-16 without a BOM: nothing says what it is, and it decodes to NULs.
+    with pytest.raises(ParseError, match="UTF-8"):
+        plaintext.parse(NOTE.encode("utf-16-le"))
