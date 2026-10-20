@@ -18,13 +18,13 @@ from collections import defaultdict
 from collections.abc import AsyncIterator
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from app import chat_store
 from app.auth import guest
-from app.auth.deps import DB, CurrentUser
+from app.auth.deps import DB, CurrentUser, refresh_cookie
 from app.config import settings
 from app.db import SessionLocal
 from app.llm.gemini import LLMBusy, LLMError, complete, stream
@@ -300,14 +300,14 @@ async def _generate(
 
 @router.post("/conversations/{conversation_id}/messages")
 async def send_message(
-    conversation_id: UUID, payload: ChatRequest, user: CurrentUser, db: DB
+    conversation_id: UUID, payload: ChatRequest, user: CurrentUser, db: DB, response: Response,
 ) -> StreamingResponse:
     # Spent before streaming starts, so an exhausted guest gets a plain 403
     # instead of a stream. Committed here: the request session's own commit
     # is not guaranteed to run before the stream does.
     await guest.spend(db, user, "message")
     await db.commit()
-    return StreamingResponse(
+    return refresh_cookie(response, StreamingResponse(
         _generate(user.id, conversation_id, payload.message, guest_credit=user.is_guest),
         media_type="text/event-stream",
         headers={
@@ -315,4 +315,4 @@ async def send_message(
             "X-Accel-Buffering": "no",   # stop proxies buffering the stream
             "Connection": "keep-alive",
         },
-    )
+    ))

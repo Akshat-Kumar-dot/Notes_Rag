@@ -71,7 +71,11 @@ async def create_session(db: DBSession, user_id: UUID, ttl: timedelta | None = N
     return token
 
 
-async def resolve_session(db: DBSession, token: str) -> User | None:
+async def resolve_session(
+    db: DBSession, token: str, response: Response | None = None
+) -> User | None:
+    """`response` is where a refreshed cookie goes. Without one the session is
+    not extended: the browser's cookie would still die on its original date."""
     token_hash = _hash(token)
     hit = _cache.get(token_hash)
     if hit is not None:
@@ -98,9 +102,13 @@ async def resolve_session(db: DBSession, token: str) -> User | None:
     # would mean a database write per API call for no real benefit. Guest
     # sessions never slide: the trial ends when it ends.
     now = datetime.now(UTC)
-    if user is not None and not user.is_guest and (now - row.last_seen_at).total_seconds() > 86_400:
+    if (response is not None and user is not None and not user.is_guest
+            and (now - row.last_seen_at).total_seconds() > 86_400):
         row.last_seen_at = now
         row.expires_at = now + timedelta(days=settings.session_ttl_days)
+        # The cookie was set once, at sign-in, with its own max-age. Re-send
+        # it, or the browser drops it on that date however active the user is.
+        set_session_cookie(response, token)
 
     _remember(token_hash, row.expires_at, user)
     return user
