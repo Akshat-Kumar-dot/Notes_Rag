@@ -87,30 +87,42 @@ async def upload(
             + (" on the free trial. Sign in with Google for larger files." if user.is_guest else "."),
         )
 
-    limit = settings.storage_limit_mb * 1024 * 1024
-    used = await db.scalar(
-        select(func.coalesce(func.sum(File.size_bytes), 0)).where(File.user_id == user.id)
-    )
-    if int(used or 0) + len(data) > limit:
-        raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"That would exceed your {_mb(limit)} storage limit "
-            f"({_mb(int(used or 0))} used). Delete something first.",
-        )
-
     digest = hashlib.sha256(data).hexdigest()
     existing = await db.scalar(
         select(File).where(File.user_id == user.id, File.sha256 == digest)
     )
-    if existing is not None:
+    # A failed copy indexed nothing and nothing retries it, so uploading the
+    # file again replaces it rather than being refused as a duplicate.
+    replaces = existing if existing is not None and existing.status == FileStatus.FAILED else None
+    if existing is not None and replaces is None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             f"You've already uploaded this file as '{existing.original_filename}'.",
         )
 
+    limit = settings.storage_limit_mb * 1024 * 1024
+    used = int(await db.scalar(
+        select(func.coalesce(func.sum(File.size_bytes), 0)).where(File.user_id == user.id)
+    ) or 0)
+    # The copy being replaced stops counting, or a full quota blocks its own retry.
+    used -= replaces.size_bytes if replaces is not None else 0
+    if used + len(data) > limit:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"That would exceed your {_mb(limit)} storage limit "
+            f"({_mb(used)} used). Delete something first.",
+        )
+
     # Last, after every check that could reject the file: a guest should not
     # lose their one upload to a duplicate or an oversized file.
     await guest.spend(db, user, "upload")
+
+    if replaces is not None:
+        await db.delete(replaces)
+        # Flushed now: (user_id, sha256) is unique, so the new row can't be
+        # inserted while the old one still exists.
+        await db.flush()
+        discard(replaces.id)
 
     file = File(
         folder_id=folder.id,
