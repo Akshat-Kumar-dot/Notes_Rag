@@ -200,9 +200,23 @@ export async function streamMessage(
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+  // Every turn must end in done or error, or the chat stays "busy" with Send
+  // disabled. A dropped connection, or a stream that closes without either
+  // event, would otherwise end it silently -- or not at all.
+  let ended = false;
+  const finish = (fn: () => void) => { if (!ended) { ended = true; fn(); } };
+  const cutOff = () => finish(() => h.onError("The connection dropped before the answer finished."));
 
   for (;;) {
-    const { done, value } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch {
+      // Aborted on purpose by the caller: not an error to show.
+      if (!signal?.aborted) cutOff();
+      return;
+    }
+    const { done, value } = chunk;
     if (done) break;
     buf += dec.decode(value, { stream: true });
     // Events are blank-line separated; a network chunk can split one in half.
@@ -222,9 +236,10 @@ export async function streamMessage(
 
       if (event === "sources") h.onSources(p.chunks as Source[], Boolean(p.low_confidence));
       else if (event === "token") h.onToken(String(p.delta ?? ""));
-      else if (event === "done") h.onDone();
-      else if (event === "error") h.onError(String(p.message ?? "Something went wrong."));
+      else if (event === "done") finish(h.onDone);
+      else if (event === "error") finish(() => h.onError(String(p.message ?? "Something went wrong.")));
       else if (event === "status") h.onStatus?.(String(p.state ?? ""));
     }
   }
+  cutOff();
 }
