@@ -42,14 +42,21 @@ def _label(filename: str, page: int | None) -> str:
 def _json(raw: str) -> dict:
     """JSON mode should return a bare document; tolerate stray prose anyway."""
     try:
-        return json.loads(raw)
+        data = json.loads(raw)
     except json.JSONDecodeError:
+        data = None
         i, j = raw.find("{"), raw.rfind("}")
         if 0 <= i < j:
             try:
-                return json.loads(raw[i:j + 1])
+                data = json.loads(raw[i:j + 1])
             except json.JSONDecodeError:
                 pass
+    # Gemma 4 sometimes wraps the object in a list. Anything that isn't an
+    # object would crash the .get() calls below with a 500 instead.
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        data = data[0]
+    if isinstance(data, dict):
+        return data
     raise LLMError("The model returned something unexpected. Try again.")
 
 
