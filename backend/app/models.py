@@ -249,8 +249,9 @@ class GuestTrial(Base):
 
 
 class DailyUsage(Base):
-    """Site-wide guest counters, one row per (day, kind). The hard ceiling on
-    what guests can cost in a day, however many IPs they rotate through."""
+    """Daily counters, one row per (day, kind): site-wide ones for guests and
+    for signed-in users, plus one per signed-in user (see
+    auth.guest.member_counter). The hard ceiling on what a day can cost."""
 
     __tablename__ = "daily_usage"
 

@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     guest_daily_trials: int = 100
     guest_daily_uploads: int = 100
     guest_daily_messages: int = 300
+
+    # --- signed-in users ---
+    # Every question, search, Teach me / Quiz me and upload calls Gemini on the
+    # one shared API key, and a Google account costs nothing to make. Without
+    # caps a single scripted account could spend the key's quota and break the
+    # app for everyone. Counted per attempt (UTC day), so deleting and
+    # re-uploading a file still counts each upload.
+    member_messages_per_day: int = 200
+    member_uploads_per_day: int = 30
+    # Site-wide ceilings for all signed-in users together.
+    member_daily_messages: int = 3000
+    member_daily_uploads: int = 300
     # Proxies in front of the app that append to X-Forwarded-For. 0 = use the
     # TCP peer (local dev). Render sets it to 1 -- verify with the log line in
     # auth/guest.py after deploying: too high lets clients spoof their IP.

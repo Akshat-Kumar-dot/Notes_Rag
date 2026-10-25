@@ -16,6 +16,7 @@ IPs, fingerprints and device ids are stored only as HMAC hashes.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import ipaddress
@@ -157,13 +158,43 @@ def _credit(kind: Kind):
     return GuestTrial.messages_used, settings.guest_messages, settings.guest_daily_messages
 
 
+_MEMBER_LIMIT = {
+    "upload": "You've reached today's limit of {n} uploads. It resets at midnight UTC.",
+    "message": "You've reached today's limit of {n} questions and searches. It resets at midnight UTC.",
+}
+_MEMBER_BUSY = "The app has reached its daily limit. Try again tomorrow."
+
+
+def member_counter(user_id: UUID, kind: Kind) -> str:
+    """A daily_usage kind for one user. daily_usage.kind is 32 characters, too
+    short for a UUID's hex, so the id goes in as 22-character base64."""
+    return f"{kind[0]}:{base64.urlsafe_b64encode(user_id.bytes).decode().rstrip('=')}"
+
+
+async def _spend_member(db: AsyncSession, user: User, kind: Kind) -> None:
+    """Signed-in users: a per-user daily cap, then the site-wide one. Both
+    count attempts and are never refunded -- an attempt is what costs money."""
+    if kind == "upload":
+        per_user, site = settings.member_uploads_per_day, settings.member_daily_uploads
+    else:
+        per_user, site = settings.member_messages_per_day, settings.member_daily_messages
+    if not await _bump_daily(db, member_counter(user.id, kind), per_user):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            _MEMBER_LIMIT[kind].format(n=per_user))
+    # On failure the caller's transaction rolls back, taking the per-user
+    # count with it: a refused request costs the user nothing.
+    if not await _bump_daily(db, f"member_{kind}", site):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, _MEMBER_BUSY)
+
+
 async def spend(db: AsyncSession, user: User, kind: Kind) -> None:
-    """Take one guest credit, or raise. No-op for signed-in users.
+    """Take one guest credit, or one of a signed-in user's daily calls, or raise.
 
     Runs in the caller's transaction: if the request fails afterwards and rolls
     back, the credit comes back with it. The WHERE used < cap makes the check
     and the increment one statement, so parallel requests cannot overspend."""
     if not user.is_guest:
+        await _spend_member(db, user, kind)
         return
     used, cap, daily_cap = _credit(kind)
     took = await db.execute(
@@ -229,6 +260,11 @@ async def purge_expired_guests(limit: int = 50) -> int:
                 GuestTrial.user_id.is_(None),
                 GuestTrial.created_at < _now() - timedelta(days=settings.guest_device_window_days),
             )
+        )
+        # Daily counters only matter on their own day, and per-user ones add
+        # rows every day; keep a week for looking back.
+        await db.execute(
+            delete(DailyUsage).where(DailyUsage.day < _now().date() - timedelta(days=7))
         )
         file_ids = list(await db.scalars(select(File.id).where(File.user_id.in_(ids)))) if ids else []
         if ids:
