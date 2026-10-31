@@ -22,9 +22,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// The site has one address. The old workers.dev one still loads, but forwards
+// here first thing: Google sign-in returns to exactly one address, so a
+// sign-in started on the other domain failed, and a session on one domain
+// is invisible on the other. Branch preview URLs are left alone.
+const SITE = "https://notesrag.byakshat.in";
+const OLD_HOST = "notes-rag.akshat-kumar-singh05.workers.dev";
+const toSite = `if(location.hostname===${JSON.stringify(OLD_HOST)})`
+  + `location.replace(${JSON.stringify(SITE)}+location.pathname+location.search+location.hash)`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: toSite }} />
+      </head>
       <body>{children}</body>
     </html>
   );
