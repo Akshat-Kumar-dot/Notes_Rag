@@ -6,7 +6,7 @@ import { Orb } from "@/components/Orb";
 import { useDictation } from "@/lib/dictation";
 import { Markdown } from "@/lib/markdown";
 import {
-  api, chats, streamMessage, type ConversationDetail, type FileRow, type Folder, type Source,
+  LOGIN_URL, api, chats, streamMessage, type ConversationDetail, type FileRow, type Folder, type Source,
 } from "@/lib/api";
 
 /** One rendered source card. Live results and stored citations both narrow to
@@ -91,6 +91,7 @@ const FIRST_FOLDER = "My notes";
 export function Chat({
   folders, scopeFolderId, resumeId, onScopeChange, onConversationCreated,
   onTurnDone, onFilesChanged, onNewChat, uploadLimitMb = 20,
+  outOfQuestions = false, outOfUploads = false,
 }: {
   folders: Folder[];
   /** The folder a NEW chat searches. Once a chat exists its scope is fixed. */
@@ -105,6 +106,10 @@ export function Chat({
   onNewChat: () => void;
   /** Shown on the empty-folder screen: 20 MB, or 5 MB on the free trial. */
   uploadLimitMb?: number;
+  /** A guest with no questions / uploads left. Only changes what is shown --
+   *  the server refuses those requests whatever the page does. */
+  outOfQuestions?: boolean;
+  outOfUploads?: boolean;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
@@ -132,7 +137,7 @@ export function Chat({
   const scopeFolders = folders.filter((f) => scopeIds.includes(f.id));
   // An old chat whose folders were all deleted has nothing left to search.
   const orphaned = fixedScope !== null && scopeFolders.length === 0;
-  const canAsk = scopeFolders.length > 0 && !orphaned;
+  const canAsk = scopeFolders.length > 0 && !orphaned && !outOfQuestions;
   const scopeName = scopeFolders.map((f) => f.name).join(", ");
   const hasFiles = scopeFolders.some((f) => f.file_count > 0)
     || uploads.some((u) => u.status === "indexed" || u.status === "partial");
@@ -185,7 +190,7 @@ export function Chat({
 
   async function addFiles(list: FileList | File[] | null) {
     const files = Array.from(list ?? []);
-    if (!files.length || orphaned) return;
+    if (!files.length || orphaned || outOfUploads) return;
 
     let target = scopeFolders[0]?.id ?? null;
     if (!target) {
@@ -293,7 +298,8 @@ export function Chat({
     onTurnDone?.();
   }
 
-  const placeholder = orphaned ? "This chat's folder was deleted"
+  const placeholder = outOfQuestions ? "Sign in to keep asking…"
+    : orphaned ? "This chat's folder was deleted"
     : !canAsk ? "Add a file to start asking…"
       : mode === "search" ? `Search ${scopeName}…` : "Ask your files…";
 
@@ -334,9 +340,18 @@ export function Chat({
   const composer = (
     <div className="composer-wrap">
       {chips}
-      <div className="composer">
+      {outOfQuestions && (
+        <div className="lockbar" role="status">
+          <span className="lockbar-ico">{I.lock}</span>
+          <span className="grow">Free trial used. Sign in to keep asking: it&apos;s free.</span>
+          <a href={LOGIN_URL} className="lockbar-btn">{I.google} Sign in</a>
+        </div>
+      )}
+      <div className="composer" data-locked={outOfQuestions}>
         <button className="iconbtn ghost" onClick={() => picker.current?.click()}
-          disabled={orphaned} title="Add files" aria-label="Add files">{I.plus}</button>
+          disabled={orphaned || outOfUploads}
+          title={outOfUploads ? "The free trial includes one document" : "Add files"}
+          aria-label="Add files">{I.plus}</button>
         <textarea
           ref={box} rows={1} value={value}
           placeholder={placeholder}
@@ -346,22 +361,28 @@ export function Chat({
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
           }}
         />
-        {mic.supported && (
+        {mic.supported && !outOfQuestions && (
           <button className="iconbtn ghost mic" data-on={mic.listening} onClick={mic.toggle}
             disabled={!canAsk} title={mic.listening ? "Stop dictation" : "Dictate"}
             aria-label={mic.listening ? "Stop dictation" : "Start dictation"}>
             {I.mic}
           </button>
         )}
-        <button className="iconbtn send" onClick={submit}
-          disabled={!value.trim() || busy || !canAsk} title="Send" aria-label="Send">
-          {I.send}
-        </button>
+        {outOfQuestions ? (
+          <a className="iconbtn send" href={LOGIN_URL} title="Sign in with Google" aria-label="Sign in with Google">{I.arrow}</a>
+        ) : (
+          <button className="iconbtn send" onClick={submit}
+            disabled={!value.trim() || busy || !canAsk} title="Send" aria-label="Send">
+            {I.send}
+          </button>
+        )}
       </div>
-      <div className="actions">
-        <button data-on={mode === "ask"} onClick={() => setMode("ask")}>Ask AI</button>
-        <button data-on={mode === "search"} onClick={() => setMode("search")}>Search Notes</button>
-      </div>
+      {!outOfQuestions && (
+        <div className="actions">
+          <button data-on={mode === "ask"} onClick={() => setMode("ask")}>Ask AI</button>
+          <button data-on={mode === "search"} onClick={() => setMode("search")}>Search Notes</button>
+        </div>
+      )}
       {/* A new chat can still change folder; an existing one cannot. */}
       {folderPicker}
     </div>
@@ -430,7 +451,13 @@ export function Chat({
                   <div className="starter-types">
                     <span>PDF</span><span>Word</span><span>Text</span><span>Markdown</span><span>Images</span>
                   </div>
-                  <p className="starter-limit">Up to {uploadLimitMb} MB per file</p>
+                  {outOfUploads ? (
+                    <p className="starter-limit">
+                      The free trial includes one document. <a href={LOGIN_URL} onClick={(e) => e.stopPropagation()}>Sign in</a> to add more.
+                    </p>
+                  ) : (
+                    <p className="starter-limit">Up to {uploadLimitMb} MB per file</p>
+                  )}
                 </div>
                 {chips}
                 {folderPicker && <div className="starter-scope">{folderPicker}</div>}
@@ -448,7 +475,7 @@ export function Chat({
               </div>
             )}
             {turns.map((t) => (
-              <article className="turn" key={t.id}>
+              <article className="turn" key={t.id} data-search={t.searchOnly}>
                 <h3 className="q">{t.question}</h3>
 
                 {t.lowConfidence && !t.error && (
@@ -465,7 +492,8 @@ export function Chat({
 
                 {!t.searchOnly && t.answer && (
                   <div className="a">
-                    <Markdown text={t.answer} ctx={{ active, onHover: setActive }} />
+                    <Markdown text={t.answer}
+                      ctx={{ active, onHover: setActive, sources: t.sources.map((s) => s.excerpt) }} />
                     {t.streaming && <span className="caret" />}
                   </div>
                 )}
@@ -492,8 +520,10 @@ export function Chat({
                             <div key={s.key} className="src" data-on={active === s.n}
                               onMouseEnter={() => setActive(s.n)} onMouseLeave={() => setActive(null)}>
                               <div className="h">
-                                <span className="trunc">[{s.n}] {s.label}</span>
-                                {s.score !== null && <span>{s.score.toFixed(3)}</span>}
+                                {/* phones: a numbered badge; desktop: [n] and the score */}
+                                <span className="src-n">{s.n}</span>
+                                <span className="trunc"><span className="src-bracket">[{s.n}] </span>{s.label}</span>
+                                {s.score !== null && <span className="src-score">{s.score.toFixed(3)}</span>}
                               </div>
                               <div className="x">{s.excerpt}</div>
                             </div>

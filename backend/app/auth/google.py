@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+import httpx
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -51,8 +52,10 @@ async def google_login(request: Request):
 async def google_callback(request: Request, db: DB):
     try:
         token = await oauth.google.authorize_access_token(request)
-    except OAuthError as exc:
-        log.warning("oauth callback failed: %s", exc)
+    except (OAuthError, httpx.HTTPError) as exc:
+        # HTTPError: reaching Google for the token or its keys failed (often
+        # right after the server wakes up). Without this it was a bare 500.
+        log.warning("oauth callback failed: %r", exc)
         # A callback replayed (Back button, a second tab) or cancelled at Google
         # while already signed in: nothing is lost, so go on to the app rather
         # than report a failed sign-in over a session that works.

@@ -10,8 +10,10 @@ import { Settings } from "@/components/Settings";
 import { Sidebar, type View } from "@/components/Sidebar";
 import { StudyMap } from "@/components/StudyMap";
 import { Topbar } from "@/components/Topbar";
+import { I, Logo } from "@/components/Icons";
 import {
-  api, chats, type Conversation, type Folder, type GuestCredits, type Storage, type User,
+  LOGIN_URL, TRIAL_LOCK_KEY, api, chats, onUnauthorised,
+  type Conversation, type Folder, type GuestCredits, type Storage, type User,
 } from "@/lib/api";
 
 export default function Workspace() {
@@ -29,6 +31,9 @@ export default function Workspace() {
   const [collapsed, setCollapsed] = useState(false);
   const [modal, setModal] = useState<ModalSpec | null>(null);
   const [drawer, setDrawer] = useState(false);
+  // Set when a free trial was refused (see TRIAL_LOCK_KEY): the chat opens
+  // locked, saying why, instead of bouncing back to the landing page.
+  const [locked, setLocked] = useState<string | null>(null);
   // Still loading after a few seconds almost always means the server was
   // asleep (Render's free tier) and is starting up.
   const [slowBoot, setSlowBoot] = useState(false);
@@ -54,7 +59,11 @@ export default function Workspace() {
   // Re-read after uploads and questions too: for a guest, /me carries the
   // credits left, and the banner should count down as they are spent.
   const loadUser = useCallback(async () => {
-    try { setUser(await api.me()); } catch { /* 401 already redirects */ }
+    try {
+      setUser(await api.me());
+      // Signed in after all (say, a trial still open in this browser).
+      try { sessionStorage.removeItem(TRIAL_LOCK_KEY); } catch { /* private mode */ }
+    } catch { /* 401 already redirects, or shows the locked screen */ }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -76,6 +85,9 @@ export default function Workspace() {
   }, []);
 
   useEffect(() => {
+    let reason: string | null = null;
+    try { reason = sessionStorage.getItem(TRIAL_LOCK_KEY); } catch { /* private mode */ }
+    if (reason) onUnauthorised(() => setLocked(reason));
     refresh().catch(() => {});
     // A reload (or a shared link) reopens the chat that was open.
     const c = new URLSearchParams(window.location.search).get("c");
@@ -154,6 +166,7 @@ export default function Workspace() {
   }
 
   // Several round trips before anything can render; show that it's working.
+  if (!user && locked) return <LockedChat reason={locked} />;
   if (!user) {
     return (
       <div className="boot">
@@ -257,6 +270,9 @@ export default function Workspace() {
             onNewChat={newChat}
             // matches max_upload_mb / guest_max_upload_mb in backend config.py
             uploadLimitMb={user.is_guest ? 5 : 20}
+            // What the composer shows. The server enforces both on its own.
+            outOfQuestions={!!user.guest && user.guest.messages_left <= 0}
+            outOfUploads={!!user.guest && user.guest.uploads_left <= 0}
           />
         )}
       </main>
@@ -266,16 +282,59 @@ export default function Workspace() {
   );
 }
 
+/** The chat, opened for someone whose free trial was refused. It looks like
+ *  the app they asked for, says why they can't ask, and offers the way in.
+ *  There is no session behind it and it calls nothing: there is nothing here
+ *  to unlock, because every request would be refused by the server anyway. */
+function LockedChat({ reason }: { reason: string }) {
+  return (
+    <div className="shell locked">
+      <main className="main">
+        <header className="lock-top">
+          <a href="/" className="lock-brand" aria-label="Notes Rag home"><Logo size={18} /><span>notesrag</span></a>
+          <a href={LOGIN_URL} className="lock-signin">Sign in</a>
+        </header>
+        <div className="chatpane">
+          <div className="scroll" data-empty="true">
+            <div className="hero lock-hero">
+              <span className="lock-badge">{I.lock}</span>
+              <h2>Sign in to keep asking</h2>
+              <p className="lock-reason">{reason}</p>
+              <p>Signing in is free. Upload your own notes and ask as much as you like.</p>
+              <div className="lock-ctas">
+                <a className="btn primary lock-btn" href={LOGIN_URL}>{I.google} Continue with Google</a>
+                <a className="btn lock-btn" href="/">Back to home</a>
+              </div>
+            </div>
+          </div>
+          <div className="composer-wrap">
+            <div className="composer" data-locked="true" aria-disabled="true">
+              <span className="iconbtn ghost">{I.lock}</span>
+              <textarea rows={1} disabled placeholder="Sign in to ask your notes…" aria-label="Locked until you sign in" />
+              <a className="iconbtn send" href={LOGIN_URL} aria-label="Sign in with Google">{I.arrow}</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function TrialBar({ credits }: { credits: GuestCredits }) {
   const { uploads_left: docs, messages_left: qs } = credits;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   return (
     <div className="trialbar" role="status">
-      <span>
+      <span className="tb-long">
         Free trial: <strong>{plural(docs, "document", "documents")}</strong> and{" "}
         <strong>{plural(qs, "question", "questions")}</strong> left. Everything is deleted after 24 hours.
       </span>
-      <a href="/api/v1/auth/google/login">Sign in with Google</a>
+      {/* Phones: one line, so the chat keeps the screen. */}
+      <span className="tb-short" title="Free trial. Everything is deleted after 24 hours.">
+        <span className="tb-dot" /> Free trial · <strong>{plural(qs, "question", "questions")}</strong>
+        {docs > 0 && <>, <strong>{plural(docs, "doc", "docs")}</strong></>} left
+      </span>
+      <a href={LOGIN_URL}>Sign in<span className="tb-wide"> with Google</span></a>
     </div>
   );
 }

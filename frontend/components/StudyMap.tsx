@@ -242,7 +242,8 @@ export function StudyMap({ folders, folderId, onPickFolder, onStudied }: {
 
           {session.kind === "teach" && (
             <div className="study-body">
-              <div className="a"><Markdown text={session.text} ctx={{ active, onHover: setActive }} /></div>
+              <div className="a"><Markdown text={session.text}
+                ctx={{ active, onHover: setActive, sources: session.passages.map((p) => p.excerpt ?? "") }} /></div>
               <Sources passages={session.passages} active={active} onHover={setActive} />
               <div className="study-actions">
                 <button className="btn" onClick={() => run("quiz")}>{I.sparkle} Now quiz me on it</button>

@@ -6,7 +6,7 @@ import { NoteStack } from "@/components/NoteStack";
 import { Orb } from "@/components/Orb";
 import { Particles } from "@/components/Particles";
 import { ZOOM_WHITE, ZoomEnter } from "@/components/ZoomEnter";
-import { api, type User } from "@/lib/api";
+import { TRIAL_LOCK_KEY, TrialError, api, type User } from "@/lib/api";
 import { fingerprint } from "@/lib/fingerprint";
 
 const LOGIN = "/api/v1/auth/google/login";
@@ -172,8 +172,19 @@ export default function Landing() {
     const slow = window.setTimeout(() => setWaking(true), 4000);
     try {
       await api.startGuest(await fingerprint());
+      try { sessionStorage.removeItem(TRIAL_LOCK_KEY); } catch { /* private mode */ }
       window.location.replace("/app");
     } catch (e) {
+      // Out of free usage: open the chat anyway, locked, with the reason and a
+      // way to sign in -- a clearer answer than an error under the button.
+      // Purely what is shown: with no session, the server refuses every call.
+      if (e instanceof TrialError && e.outOfFreeUsage) {
+        try {
+          sessionStorage.setItem(TRIAL_LOCK_KEY, e.message);
+          window.location.replace("/app");
+          return;
+        } catch { /* storage blocked: fall back to the message here */ }
+      }
       setTrialError(e instanceof Error ? e.message : "Couldn't start a free trial.");
       setStarting(false);
     } finally {
@@ -195,10 +206,12 @@ export default function Landing() {
       {tryLabel} {!starting && I.arrow}
     </button>
   );
+  // Phones swap this button for a small "Sign out" link under the buttons.
   const secondaryCta = me && !me.is_guest ? (
-    <button className="lp-btn ghost" onClick={signOut}>Sign out</button>
+    <button className="lp-btn ghost lp-signout-btn" onClick={signOut}>Sign out</button>
   ) : (
-    <a className="lp-btn ghost" href={LOGIN}>{I.google} Sign in with Google</a>
+    // Phones put both buttons in one row, so this one says just "Sign in".
+    <a className="lp-btn ghost" href={LOGIN}>{I.google} <span>Sign in<span className="lp-wide-only"> with Google</span></span></a>
   );
 
   return (
@@ -240,7 +253,14 @@ export default function Landing() {
               {secondaryCta}
             </div>
             {me && !me.is_guest && (
-              <p className="lp-signed">Signed in as {me.display_name ?? me.email}</p>
+              <p className="lp-signed">
+                Signed in as <b>{me.display_name ?? me.email}</b>
+                {/* phones only (see .lp-signout-btn) */}
+                <span className="lp-signout-link">
+                  <span aria-hidden="true">·</span>
+                  <button className="lp-signout" onClick={signOut}>Sign out</button>
+                </span>
+              </p>
             )}
             <ul className="lp-checks">
               <li>{I.check} No sign-up to try</li>

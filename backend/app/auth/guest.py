@@ -346,13 +346,20 @@ async def start_guest(
     reused, from_ip = (await db.execute(
         select(
             func.count().filter(
-                GuestTrial.created_at > now - timedelta(days=settings.guest_device_window_days),
                 or_(
-                    GuestTrial.device_hash == device_h,
+                    and_(
+                        GuestTrial.device_hash == device_h,
+                        GuestTrial.created_at > now - timedelta(days=settings.guest_device_window_days),
+                    ),
                     # Fingerprints collide across identical phones, so on its
                     # own it would lock out strangers. Together with the same
-                    # network it catches incognito and cleared cookies.
-                    and_(GuestTrial.fingerprint_hash == fp_h, GuestTrial.ip_hash == ip_h),
+                    # network it catches incognito and cleared cookies -- which
+                    # happen right away, so only the last day counts. Over 30
+                    # days it locked out classmates with the same phone.
+                    and_(
+                        GuestTrial.fingerprint_hash == fp_h, GuestTrial.ip_hash == ip_h,
+                        GuestTrial.created_at > now - timedelta(days=1),
+                    ),
                 ),
             ),
             func.count().filter(
@@ -363,13 +370,14 @@ async def start_guest(
     if reused:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "This device has already used its free trial. Sign in with Google to keep going.",
+            "This browser already used a free trial recently. Sign in with Google to keep going.",
         )
 
     if from_ip >= settings.guest_trials_per_ip_per_day and not loopback:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            "Too many free trials from this network today. Sign in with Google, or try tomorrow.",
+            "Free trials from this network (Wi-Fi or mobile data) are used up for today, "
+            "possibly by others on it. Sign in with Google, or try another network.",
         )
 
     if not await _bump_daily(db, "guest_trial", settings.guest_daily_trials):

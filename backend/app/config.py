@@ -58,7 +58,9 @@ class Settings(BaseSettings):
     # and changeable, fingerprints can be faked -- so the daily totals below are
     # what actually bounds the API bill.
     guest_device_window_days: int = 30
-    guest_trials_per_ip_per_day: int = 3
+    # A campus Wi-Fi or a mobile carrier puts many people behind one IP, so
+    # this is per network, not per person; 3 locked out a whole classroom.
+    guest_trials_per_ip_per_day: int = 10
     guest_daily_trials: int = 100
     guest_daily_uploads: int = 100
     guest_daily_messages: int = 300
@@ -87,6 +89,8 @@ class Settings(BaseSettings):
 
     # --- ingest ---
     max_upload_mb: int = 20
+    # ~450 tokens each, so ~900 pages: bounds the embedding calls one upload makes.
+    max_chunks_per_file: int = 2000
     # Per-user cap on total uploaded bytes. Enforced on upload, and what the
     # sidebar meter fills against -- a bar with no real limit behind it would be
     # decoration. Sized for Neon's free tier, which is ~0.5GB for everything.

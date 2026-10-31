@@ -76,10 +76,14 @@ async def upload(
     folder = await owned_folder(db, user, folder_id)
     mime = _detect_mime(upload)
 
-    data = await upload.read()
+    max_mb = settings.guest_max_upload_mb if user.is_guest else settings.max_upload_mb
+    # The multipart parser has already spooled the upload to disk; reading it
+    # whole into memory first would let one huge request (sent straight to the
+    # server, past Cloudflare's 100MB cap) exhaust RAM. Read one byte past the
+    # limit instead: enough to know it is too big.
+    data = await upload.read(max_mb * 1024 * 1024 + 1)
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file is empty.")
-    max_mb = settings.guest_max_upload_mb if user.is_guest else settings.max_upload_mb
     if len(data) > max_mb * 1024 * 1024:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

@@ -111,6 +111,15 @@ class CacheHeaders:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 is_page = headers.get("content-type", "").startswith("text/html")
+                headers.setdefault("X-Content-Type-Options", "nosniff")
+                headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+                if is_page:
+                    # No framing (clickjacking), and no powerful features the
+                    # app never uses; the microphone is for dictation.
+                    headers.setdefault("X-Frame-Options", "DENY")
+                    headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+                    headers.setdefault("Permissions-Policy",
+                                       "camera=(), geolocation=(), payment=(), microphone=(self)")
                 if path.startswith("/_next/static/"):
                     headers["Cache-Control"] = "public, max-age=31536000, immutable"
                 elif is_page:

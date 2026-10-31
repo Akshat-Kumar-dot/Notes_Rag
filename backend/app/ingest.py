@@ -6,6 +6,7 @@ to a real worker later needs no changes here.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -35,20 +36,26 @@ async def process_file(file_id: UUID) -> None:
 
     try:
         data = load_staged(file_id)
-        result = parser_for(file.mime_type)(data)
+        # Parsing is CPU-bound (PyMuPDF, python-docx, Tesseract OCR) and can take
+        # seconds. On the event loop it would freeze every other request --
+        # streamed answers included -- until it finished; a thread doesn't.
+        result = await asyncio.to_thread(parser_for(file.mime_type), data)
 
-        pieces = chunk_pages(
+        pieces = await asyncio.to_thread(
+            chunk_pages,
             result.pages,
             size=settings.chunk_tokens,
             overlap=settings.chunk_overlap_tokens,
         )
         if not pieces:
             raise ParseError("Nothing indexable was found in this file.")
-        # Embedding is the expensive step, so a guest's one document is capped
-        # by chunks rather than bytes: a 5MB text file can hold 1,000+ pages.
-        truncated = is_guest and len(pieces) > settings.guest_max_chunks
+        # Embedding is the expensive step, so a document is capped by chunks
+        # rather than bytes: a 20MB text file can hold 3,000+ pages, and every
+        # chunk is a call on the one shared API key.
+        cap = settings.guest_max_chunks if is_guest else settings.max_chunks_per_file
+        truncated = len(pieces) > cap
         if truncated:
-            pieces = pieces[: settings.guest_max_chunks]
+            pieces = pieces[:cap]
 
         vectors = await embed_documents([p.text for p in pieces])
 
@@ -83,11 +90,14 @@ async def process_file(file_id: UUID) -> None:
             file.chunk_count = len(pieces)
             file.indexed_at = datetime.now(UTC)
             if truncated:
-                # Shown under the file, so the guest knows why later pages
+                # Shown under the file, so its owner knows why later pages
                 # never come up in answers.
                 file.error = (
                     f"Free trial: only the first {len(pieces)} sections were indexed. "
                     "Sign in with Google to index whole documents."
+                    if is_guest else
+                    f"Only the first {len(pieces)} sections were indexed (the per-file "
+                    "limit). Split very long documents into parts."
                 )
             file.status = (
                 FileStatus.PARTIAL if coverage < settings.keep_original_below_coverage

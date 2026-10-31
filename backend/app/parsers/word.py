@@ -1,13 +1,31 @@
 from __future__ import annotations
 
 import io
+import zipfile
 
 import docx
 
 from app.parsers.base import Page, ParseError, ParseResult
 
+# A .docx is a zip. A few MB can unpack to gigabytes of XML (a "zip bomb"), and
+# python-docx would load all of it into memory. Real documents unpack to a few
+# times their size, so the sizes declared in the zip are checked first.
+MAX_UNPACKED = 200 * 1024 * 1024
+MAX_RATIO = 100
+
+
+def _check_unpacked_size(data: bytes) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            unpacked = sum(i.file_size for i in z.infolist())
+    except zipfile.BadZipFile:
+        return   # not a zip at all; python-docx reports it below
+    if unpacked > MAX_UNPACKED or unpacked > MAX_RATIO * max(len(data), 1):
+        raise ParseError("This Word file expands to far more than its size. It can't be read safely.")
+
 
 def parse(data: bytes) -> ParseResult:
+    _check_unpacked_size(data)
     try:
         document = docx.Document(io.BytesIO(data))
     except Exception:

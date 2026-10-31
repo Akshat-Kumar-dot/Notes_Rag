@@ -170,10 +170,15 @@ async def delete_conversation(conversation_id: UUID, user: CurrentUser):
 async def _generate(
     user_id: UUID, conversation_id: UUID, question: str, *, guest_credit: bool = False
 ) -> AsyncIterator[str]:
+    # Set as soon as any of the answer is sent. After that a failure refunds
+    # nothing: otherwise a guest who could make answers fail late (or who got
+    # most of one before the model gave up) would keep asking for free.
+    delivered = False
+
     async def failed() -> None:
         # A guest paid a credit up front; don't keep it when the answer failed
         # for reasons that were not theirs.
-        if guest_credit:
+        if guest_credit and not delivered:
             await guest.refund(user_id, "message")
 
     try:
@@ -242,6 +247,7 @@ async def _generate(
                 try:
                     async for token in stream(prompt):
                         buf.append(token)
+                        delivered = True
                         yield _sse("token", {"delta": token})
                     break
                 except LLMBusy as exc:

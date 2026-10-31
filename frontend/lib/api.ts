@@ -1,9 +1,20 @@
 const BASE = "/api/v1";
+export const LOGIN_URL = BASE + "/auth/google/login";
+
+/** What a signed-out request does. Normally: back to the landing page. The
+ *  workspace swaps this for its locked screen when a free trial was refused.
+ *  Only the screen changes -- the server still refuses every request. */
+let unauthorised = () => window.location.replace("/");
+export function onUnauthorised(fn: () => void) { unauthorised = fn; }
+
+/** Why the free trial was refused, carried from the landing page to the
+ *  workspace (this tab only). Display text, never a permission. */
+export const TRIAL_LOCK_KEY = "trial-locked";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, { credentials: "include", ...init });
   if (res.status === 401) {
-    window.location.replace("/");
+    unauthorised();
     throw new Error("unauthorised");
   }
   if (!res.ok) {
@@ -53,7 +64,7 @@ export const api = {
   startGuest: async (fingerprint: string): Promise<User> => {
     const res = await fetch(BASE + "/auth/guest", { credentials: "include", ...json({ fingerprint }) });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.detail ?? "Couldn't start a free trial.");
+    if (!res.ok) throw new TrialError(body.detail ?? "Couldn't start a free trial.", res.status);
     return body;
   },
   logout: () => req<void>("/auth/logout", { method: "POST" }),
@@ -90,6 +101,15 @@ export const api = {
   conversation: (id: string) => req<Conversation & { messages: Message[] }>(`/conversations/${id}`),
   deleteConversation: (id: string) => req<void>(`/conversations/${id}`, { method: "DELETE" }),
 };
+
+/** A refused free trial. 403 (this browser had one), 429 (this network is
+ *  out of trials today) and 503 (all of today's trials are gone) mean "no
+ *  free usage here": retrying won't help, signing in will. Anything else
+ *  (the server waking up, a dropped connection) is worth another try. */
+export class TrialError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+  get outOfFreeUsage() { return [403, 429, 503].includes(this.status); }
+}
 
 // --- chat graph ---
 export interface GraphNode {

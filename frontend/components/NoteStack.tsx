@@ -330,14 +330,15 @@ function createScene(T: Three, box: HTMLElement): Scene | null {
       renderer.setSize(w, h, false);
       const aspect = w / h, tanV = Math.tan((camera.fov * Math.PI) / 360), wide = aspect >= 1.05;
       // Wide screens: the stack stands the full height of the screen (like the
-      // lenis hand), right of centre and clear of the cards. Phones: smaller,
-      // above the cards. Either way the scattered pages still fit across.
+      // lenis hand), right of centre and clear of the cards. Phones: as big as
+      // the band between the title and the card deck allows, centred in it;
+      // scattered pages may run off the sides there, which reads as motion.
       const dist = wide ? Math.max(5.6 / (2 * tanV), 10 / (2 * tanV * aspect))
-        : Math.max(13.1 / (2 * tanV), 8 / (2 * tanV * aspect));
+        : Math.max(11 / (2 * tanV), 6.1 / (2 * tanV * aspect));
       camera.aspect = aspect;
       camera.position.set(0, dist * 0.36, dist);   // looking down ~20 degrees, onto the pages
       camera.lookAt(0, 0, 0);
-      camera.setViewOffset(w, h, wide ? -w * 0.08 : 0, wide ? -h * 0.04 : h * 0.14, w, h);
+      camera.setViewOffset(w, h, wide ? -w * 0.08 : 0, wide ? -h * 0.04 : h * 0.07, w, h);
       camera.updateProjectionMatrix();
     },
     warm() {
@@ -385,10 +386,14 @@ export function NoteStack({ cta, foot }: { cta: React.ReactNode; foot: React.Rea
       // sheet make way for the cards.
       title.current?.toggleAttribute("data-on", enter > 0.12 && !ended);
       lede.current?.toggleAttribute("data-on", enter > 0.3 && !ready);
+      const ons = cards.current.map((_, i) =>
+        i === 0 ? ready : i < 4 ? t > i - 0.5 : p > FEATURES + (i - 4) * FEATURE_STEP);
+      const newest = ons.lastIndexOf(true);
       cards.current.forEach((c, i) => {
-        const on = i === 0 ? ready : i < 4 ? t > i - 0.5 : p > FEATURES + (i - 4) * FEATURE_STEP;
-        c?.toggleAttribute("data-on", on && !ended);
+        c?.toggleAttribute("data-on", ons[i] && !ended);
         c?.toggleAttribute("data-gone", ended);
+        // How far behind the newest card this one is: phones draw a deck by it.
+        c?.style.setProperty("--depth", String(Math.max(0, newest - i)));
       });
       end.current?.toggleAttribute("data-on", ended);
       scene?.draw(t, enter, spin, still ? 0 : now / 1000);

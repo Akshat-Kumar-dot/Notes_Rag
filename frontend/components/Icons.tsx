@@ -49,6 +49,7 @@ export const I = {
   grid: s('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', 16),
   expand: s('<path d="m6 17 5-5-5-5M13 17l5-5-5-5"/>', 16, 2),
   check: s('<path d="M20 6 9 17l-5-5"/>', 13, 2.2),
+  lock: s('<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>'),
   sparkle: s('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/>', 14),
   search: s('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 15),
   quote: s('<path d="M4 6h16M4 12h10M4 18h7"/>', 16),

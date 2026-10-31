@@ -11,6 +11,18 @@ import type { ReactNode } from "react";
 export interface CiteCtx {
   active: number | null;
   onHover: (n: number | null) => void;
+  /** Text the answer was written from (its source excerpts). A link is only
+   *  clickable if its exact address appears there; see linkAllowed. */
+  sources?: string[];
+}
+
+/** Model output can be steered by a document (prompt injection) into writing
+ *  a link that carries the user's notes off to another site in its address.
+ *  A link the user's own sources don't contain word for word is shown as
+ *  plain text instead, so there is nothing to click. */
+export function linkAllowed(href: string, sources: string[] | undefined): boolean {
+  if (!/^(https?:|mailto:)/i.test(href)) return false;
+  return !!sources && sources.some((s) => s.includes(href));
 }
 
 // Order matters: code before links, links before bare [1] citations, bold
@@ -46,7 +58,7 @@ function inline(src: string, ctx: CiteCtx, keyBase: string): ReactNode[] {
       const cut = tok.indexOf("](");
       const label = tok.slice(1, cut);
       const href = tok.slice(cut + 2, -1);
-      const safe = /^(https?:|mailto:)/i.test(href);
+      const safe = linkAllowed(href, ctx.sources);
       out.push(
         safe
           ? <a key={k} href={href} target="_blank" rel="noopener noreferrer">{label}</a>

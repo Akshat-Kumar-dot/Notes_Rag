@@ -3,3 +3,12 @@
 # forever. Pages always revalidates the HTML itself, so a deploy shows at once.
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Every page: no framing by other sites (clickjacking), no MIME sniffing, and
+# no powerful features the app never uses. The microphone is for dictation.
+/*
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), geolocation=(), payment=(), microphone=(self)
