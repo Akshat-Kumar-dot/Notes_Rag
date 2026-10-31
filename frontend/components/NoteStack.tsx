@@ -40,14 +40,15 @@ const STEPS = [
   { title: "A cited answer", text: "They become one answer, every sentence linked to its source." },
   // the features, while the stack keeps turning
   { title: "Study map", text: "Every passage of your notes: lit where you've studied, dark where you haven't." },
-  { title: "Teach me, quiz me", text: "Pick a dark spot to get it explained, or answer a question marked against your notes." },
-  { title: "Chats that connect", text: "The Chat graph links conversations that drew on the same passages." },
-  { title: "Says when it doesn't know", text: "If your files don't cover a question, the answer says so instead of inventing one." },
 ];
 
 // Scroll progress through the section: the four phases play out by STORY,
 // the feature cards come in from FEATURES, and the last screen takes over at END.
-const STORY = 0.5, FEATURES = 0.54, FEATURE_STEP = 0.065, END = 0.86;
+// With one feature card the section is shorter (--sec-h in globals.css), so
+// these are rescaled to keep the story's pace the same as with four.
+const STORY = 0.62, FEATURES = 0.67, FEATURE_STEP = 0.08, END = 0.83;
+// How fast the stack turns after the story, per unit of scroll progress.
+const SPIN = 1.93;
 // Before all that, the first sheet rises in and floats alone (with a few words
 // beside it) for this many screen heights of scrolling, before the cards come.
 const INTRO = 0.6;
@@ -376,7 +377,7 @@ export function NoteStack({ cta, foot }: { cta: React.ReactNode; foot: React.Rea
       // a short rest at both ends of the story; reduced motion shows the stack, standing still
       const t = still ? 1 : Math.min(3, Math.max(0, (p / STORY) * 3.4 - 0.2));
       // turning on its own, then all through the story, then it just keeps turning
-      const spin = still ? 0 : Math.max(0, p - STORY) * 2.4 - 0.5 * (1 - lead);
+      const spin = still ? 0 : Math.max(0, p - STORY) * SPIN - 0.5 * (1 - lead);
       const ended = !still && p > END;
       const ready = lead > 0.95;   // the cards can come in
       // The title is in the pinned screen, so it rises from below with the first

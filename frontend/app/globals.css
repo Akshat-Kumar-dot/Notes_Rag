@@ -346,7 +346,7 @@ html.lenis, html.lenis body { height: auto; }
    (components/NoteStack.tsx). After the zoom the page turns white here. */
 .lp { --paper: #f4f4f5; --tint: #dcefe3; --expo: cubic-bezier(0.19, 1, 0.22, 1); }
 .paper {
-  --sec-h: 1020vh; position: relative; height: var(--sec-h); background: var(--paper); color: #0b0b0c;
+  --sec-h: 852vh; position: relative; height: var(--sec-h); background: var(--paper); color: #0b0b0c;
   /* Starts over the zoom's last stretch, which is already plain white: the first
      sheet comes up sooner, and there's no hairline of the dark page between them. */
   margin-top: -25vh;
@@ -361,7 +361,7 @@ html.lenis, html.lenis body { height: auto; }
 .paper-gl { position: absolute; inset: 0; }
 .paper-gl canvas { display: block; width: 100%; height: 100%; }
 /* where "Features" in the top bar scrolls to: the first feature card */
-.paper-anchor { position: absolute; left: 0; top: calc(60vh + (var(--sec-h) - 160vh) * 0.56); }
+.paper-anchor { position: absolute; left: 0; top: calc(60vh + (var(--sec-h) - 160vh) * 0.69); }
 
 /* lines of big type that slide up into view (data-on on the block or its parent) */
 .rise > span { display: block; overflow: hidden; padding-bottom: 0.04em; }
@@ -383,7 +383,7 @@ html.lenis, html.lenis body { height: auto; }
 }
 .paper-lede em { font-style: normal; color: #2fae66; }
 .paper-cards {
-  --count: 8; --card: clamp(250px, 21vw, 400px); --top: calc(var(--lp-nav-h) + 26px); --pad: var(--lp-edge);
+  --count: 5; --card: clamp(250px, 21vw, 400px); --top: calc(var(--lp-nav-h) + 26px); --pad: var(--lp-edge);
   position: absolute; inset: 0; z-index: 1; list-style: none; pointer-events: none;
 }
 /* each card lands one step further down and to the right than the last */
@@ -441,7 +441,7 @@ html.lenis, html.lenis body { height: auto; }
 .paper-end[data-on] .paper-foot { opacity: 1; pointer-events: auto; }
 
 @media (max-width: 960px) {
-  .paper { --sec-h: 880vh; }
+  .paper { --sec-h: 740vh; }
   .lp .paper-lede { left: 16px; right: 16px; bottom: 12vh; max-width: none; font-size: 22px; }
   .lp .paper-h { top: calc(var(--lp-nav-h) + 12px); left: 16px; right: 16px; font-size: 26px; }
   /* phones: the pages turn in the top half, the cards pile up below them */
