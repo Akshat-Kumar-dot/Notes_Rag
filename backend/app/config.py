@@ -102,7 +102,9 @@ class Settings(BaseSettings):
     dense_candidates: int = 40
     sparse_candidates: int = 40
     rrf_k: int = 60
-    context_chunks: int = 8
+    # Passages sent to the model per answer, which is also how many source
+    # cards show under it.
+    context_chunks: int = 5
     min_score: float = 0.30
 
     @property
