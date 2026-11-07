@@ -26,6 +26,13 @@ def _mb(n: int) -> str:
     return f"{n / (1024 * 1024):.0f}MB"
 
 
+def _meter_limit(is_guest: bool) -> int:
+    """What the sidebar meter fills against. A guest's whole allowance is one
+    small document, so showing them the 500MB account quota would be false."""
+    mb = settings.guest_max_upload_mb if is_guest else settings.storage_limit_mb
+    return mb * 1024 * 1024
+
+
 @router.get("/storage", response_model=StorageOut)
 async def storage_usage(user: CurrentUser, db: DB) -> StorageOut:
     """Backs the sidebar meter. Counts uploaded bytes, which is also what the
@@ -41,7 +48,7 @@ async def storage_usage(user: CurrentUser, db: DB) -> StorageOut:
     )
     return StorageOut(
         used_bytes=int(used or 0),
-        limit_bytes=settings.storage_limit_mb * 1024 * 1024,
+        limit_bytes=_meter_limit(user.is_guest),
         file_count=files or 0,
         folder_count=folders or 0,
     )
