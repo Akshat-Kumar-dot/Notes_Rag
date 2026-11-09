@@ -13,11 +13,19 @@ HALF_LIFE_DAYS, so the map shows forgetting as well as what was never touched:
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Literal
 
 from app.mongo import conversations, quizzes, study_events
+
+_CITE = re.compile(r"\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]")
+
+
+def cited_ranks(answer: str) -> set[int]:
+    """The source numbers an answer actually cites: [2], and [1, 3] too."""
+    return {int(n) for group in _CITE.findall(answer or "") for n in group.split(",")}
 
 HALF_LIFE_DAYS = 7.0
 LIT = 0.35
@@ -68,9 +76,15 @@ async def strengths(
             "chunk_id": "$messages.citations.chunk_id",
             "rank": "$messages.citations.rank",
             "at": "$messages.created_at",
+            "content": "$messages.content",
         }},
     ]
     async for r in await conversations.aggregate(pipeline):
+        # Every answer lists all the passages it was given, but only the ones
+        # it cites were actually used: one answer citing [1] used to light up
+        # all eight passages, and the map showed "100% studied" after one question.
+        if r["rank"] not in cited_ranks(r.get("content", "")):
+            continue
         add(r["chunk_id"], CITED_TOP if r["rank"] <= 3 else CITED_LOW, r["at"])
 
     async for e in study_events.find({"user_id": user_id, "folder_id": folder_id}):
